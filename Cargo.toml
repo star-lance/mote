@@ -9,6 +9,7 @@ license = "MIT"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 fontdue = "0.9"
+glam = "0.34"
 ratatui = { version = "0.30", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_ignored = "0.1"
