@@ -4,3 +4,4 @@ pub mod config;
 pub mod geom;
 pub mod glyphs;
 pub mod input;
+pub mod scene;
