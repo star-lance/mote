@@ -4,5 +4,7 @@ pub mod config;
 pub mod geom;
 pub mod glyphs;
 pub mod input;
+pub mod matcher;
 pub mod raster;
+pub mod render;
 pub mod scene;
