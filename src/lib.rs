@@ -1,3 +1,4 @@
+pub mod app;
 pub mod atlas;
 pub mod atlas_gen;
 pub mod config;
@@ -8,3 +9,5 @@ pub mod matcher;
 pub mod raster;
 pub mod render;
 pub mod scene;
+pub mod term;
+pub mod ui;
