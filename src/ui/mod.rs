@@ -4,7 +4,9 @@ use ratatui::buffer::Buffer;
 
 use crate::glyphs::DenyList;
 
+pub mod login;
 pub mod scene_view;
+pub mod text_input;
 
 /// The first cell whose symbol contains a denied character.
 pub fn find_denied(buf: &Buffer, deny: &DenyList) -> Option<(u16, u16, char)> {

@@ -15,6 +15,7 @@ use crate::render::Renderer;
 use crate::scene::{CameraControls, Scene};
 use crate::term::{self, Term};
 use crate::ui::find_denied;
+use crate::ui::login::{LoginPanel, authenticate, panel_rect};
 use crate::ui::scene_view::SceneView;
 
 /// Cell width / height: measured if the terminal reports pixels, else the atlas's.
@@ -39,6 +40,7 @@ struct App {
     scene: Scene,
     controls: CameraControls,
     renderer: Renderer,
+    login: Option<LoginPanel>,
     focus: Focus,
     show_debug: bool,
     cell_px: Option<[u16; 2]>,
@@ -48,11 +50,21 @@ struct App {
 
 impl App {
     fn new(cfg: Config, glyphs: ValidatedGlyphs, atlas: Atlas) -> Self {
+        let login = cfg
+            .ui
+            .login
+            .enabled
+            .then(|| LoginPanel::new(glyphs.deny.clone()));
         Self {
             scene: Scene::from_config(&cfg.scene, cfg.render.feature_edge_angle_deg),
             controls: CameraControls::default(),
             renderer: Renderer::new(&cfg, &atlas, &glyphs.palette),
-            focus: Focus::Scene,
+            focus: if login.is_some() {
+                Focus::Login
+            } else {
+                Focus::Scene
+            },
+            login,
             show_debug: false,
             cell_px: term::cell_pixel_size(),
             fps: 0.0,
@@ -73,7 +85,8 @@ impl App {
                 let Some(ev) = from_crossterm(event::read()?) else {
                     continue;
                 };
-                if !self.handle_event(&ev) {
+                let size = terminal.size()?;
+                if !self.handle_event(&ev, Rect::new(0, 0, size.width, size.height)) {
                     return Ok(());
                 }
             }
@@ -95,12 +108,18 @@ impl App {
         }
     }
 
+    fn login_rect(&self, screen: Rect) -> Option<Rect> {
+        self.login
+            .as_ref()
+            .and_then(|_| panel_rect(screen, self.cfg.ui.login.position))
+    }
+
     /// Returns false when the app should quit.
-    fn handle_event(&mut self, ev: &Event) -> bool {
+    fn handle_event(&mut self, ev: &Event, screen: Rect) -> bool {
         if let Event::Resize { .. } = ev {
             self.cell_px = term::cell_pixel_size();
         }
-        match route(ev, self.focus, &self.cfg.keys, None) {
+        match route(ev, self.focus, &self.cfg.keys, self.login_rect(screen)) {
             Route::Quit => return false,
             Route::ToggleMatcher => {
                 self.renderer.mode = match self.renderer.mode {
@@ -110,7 +129,19 @@ impl App {
             }
             Route::ToggleDebug => self.show_debug = !self.show_debug,
             Route::FocusScene => self.focus = Focus::Scene,
-            Route::FocusLogin | Route::Login => {}
+            Route::FocusLogin => self.focus = Focus::Login,
+            Route::Login if matches!(ev, Event::MouseDown { .. }) => self.focus = Focus::Login,
+            Route::Login => {
+                if let Some(panel) = &mut self.login
+                    && let Some(submit) = panel.handle_event(ev)
+                {
+                    let result = match authenticate(&submit.username, &submit.password) {
+                        Ok(()) => "ok".to_string(),
+                        Err(e) => e.to_string(),
+                    };
+                    panel.set_status(format!("login stub: {result} (user '{}')", submit.username));
+                }
+            }
             Route::Scene => self.controls.handle_event(ev, &mut self.scene.camera),
         }
         true
@@ -119,6 +150,7 @@ impl App {
     fn draw(&mut self, terminal: &mut Term) -> anyhow::Result<()> {
         let size = terminal.size()?;
         let screen = Rect::new(0, 0, size.width, size.height);
+        let login_rect = self.login_rect(screen);
         let colors = &self.cfg.colors;
         let scene_style = Style::default().fg(colors.fg).bg(colors.bg);
 
@@ -147,6 +179,9 @@ impl App {
                 },
                 screen,
             );
+            if let (Some(panel), Some(rect)) = (&self.login, login_rect) {
+                panel.render(rect, f.buffer_mut(), self.focus == Focus::Login, colors);
+            }
             if let Some(text) = debug_text {
                 let style = Style::default().fg(colors.ui_fg).bg(colors.bg);
                 let area = Rect {
