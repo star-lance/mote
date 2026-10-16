@@ -1,0 +1,47 @@
+#!/bin/sh
+# Launch mote in a dedicated kitty window with the bundled font pinned, so the
+# glyph atlas matches what is on screen. Extra arguments are passed to mote.
+#   MOTE_BIN        mote binary (default: target/release/mote in this repo)
+#   MOTE_FONT_SIZE  kitty font size in points (default: 12)
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+# A private per-user directory: never a shared, guessable path in /tmp.
+if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+    CONF_DIR="$XDG_RUNTIME_DIR/mote"
+else
+    CONF_DIR="${TMPDIR:-/tmp}/mote-$(id -u)"
+fi
+if [ -L "$CONF_DIR" ]; then
+    echo "mote-launch: refusing to use $CONF_DIR: it is a symlink" >&2
+    exit 1
+fi
+mkdir -p -m 700 "$CONF_DIR"
+if [ ! -O "$CONF_DIR" ]; then
+    echo "mote-launch: refusing to use $CONF_DIR: not owned by you" >&2
+    exit 1
+fi
+chmod 700 "$CONF_DIR"
+
+xml_escape() {
+    printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+FONT_DIR=$(xml_escape "$ROOT/assets/fonts")
+
+cat > "$CONF_DIR/fonts.conf" <<CONF
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <dir>$FONT_DIR</dir>
+</fontconfig>
+CONF
+
+export FONTCONFIG_FILE="$CONF_DIR/fonts.conf"
+exec kitty --class mote \
+    -o font_family="IoskeleyMonoTerm Nerd Font Mono" \
+    -o font_size="${MOTE_FONT_SIZE:-12}" \
+    -o disable_ligatures=always \
+    -o modify_font="cell_height 100%" \
+    "${MOTE_BIN:-$ROOT/target/release/mote}" "$@"
