@@ -38,6 +38,63 @@ cage -- scripts/mote-launch
 
 Keys are configurable under `[keys]`.
 
+## Configuration
+
+`$XDG_CONFIG_HOME/mote/config.toml` (or `--config PATH`). Every key is
+optional, and unknown keys produce a warning.
+
+```toml
+fps = 30
+
+[colors]
+fg = "#b0b0b0"        # scene color
+bg = "reset"
+
+[glyphs]
+palette = "ascii95"   # or a literal string of characters, e.g. " .:-=+*#%@/\\|_"
+deny = ["U+2500-U+257F"]  # extra forbidden characters (block elements are always forbidden)
+
+[render]
+line_thickness = 1.5  # in sub-cell samples
+
+[scene.camera]
+position = [0, 0, 6]
+fov_deg = 50
+
+[[scene.objects]]
+mesh = { type = "icosahedron" }
+position = [-3, 1.5, 0]
+spin = [0, 40, 0]     # degrees per second
+
+[[scene.objects]]
+mesh = { type = "torus", segments = 24, sides = 12 }
+position = [3, -1.5, 0]
+rotation = [60, 0, 0]
+spin = [10, 25, 0]
+
+[ui.login]
+enabled = true
+position = "center"   # center | top | bottom
+```
+
+Meshes: `tetrahedron`, `cube`, `octahedron`, `icosahedron`,
+`torus` (`major`, `minor`, `segments`, `sides`), `sphere` (`segments`, `rings`).
+
+## Using another font (glyphgen)
+
+The atlas holds each palette glyph's shape at the sub-cell sampling resolution
+for one font at one size. To build one for another font:
+
+```sh
+cargo run --release --bin glyphgen -- --font /path/to/Font.ttf --size-px 16 --out my-atlas.json
+```
+
+Then set `glyphs.atlas = "my-atlas.json"` (and optionally `glyphs.font` so mote
+can warn if the atlas came from a different file). On startup mote compares the
+terminal's real cell size with the atlas and prints the `glyphgen --cell WxH`
+to use if they differ. Run `glyphgen --help` for palette, denylist and sampling
+options.
+
 ## Font
 
 Bundled font: Ioskeley Mono (Term, Nerd Font patched) by Ahmed Hatem, based on
