@@ -5,7 +5,6 @@ use rayon::prelude::*;
 use crate::atlas::Atlas;
 use crate::raster::CoverageBuffer;
 
-/// Cells whose brightest sample is below this are left blank.
 const EMPTY_THRESHOLD: f32 = 0.02;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,7 +27,10 @@ impl CellGrid {
         self.cells[row * self.cols + col]
     }
 
-    /// Rows joined by newlines, trailing spaces kept, no trailing newline.
+    /// Renders the grid as text.
+    ///
+    /// # Returns
+    /// The rows joined by newlines, without a trailing newline.
     pub fn to_text(&self) -> String {
         self.cells
             .chunks(self.cols.max(1))
@@ -38,8 +40,13 @@ impl CellGrid {
     }
 }
 
-/// Runs `pick(patch)` for every cell in parallel over rows. Requires
-/// `buf.width == grid.cols * S_w` and `buf.height == grid.rows * S_h`.
+/// Picks a character for every cell, in parallel over rows.
+///
+/// # Arguments
+/// * `buf` - coverage at `cols * S_w` by `rows * S_h` samples
+/// * `grid` - receives the characters
+/// * `sampling` - samples per cell
+/// * `pick` - maps a cell's samples to a character
 fn for_each_cell(
     buf: &CoverageBuffer,
     grid: &mut CellGrid,
@@ -70,14 +77,19 @@ fn for_each_cell(
         });
 }
 
-/// Picks the glyph whose bitmap is closest to the cell (sum of squared differences).
 pub struct GlyphMatcher {
     sampling: [usize; 2],
-    /// Sorted by code point so ties resolve to the lowest.
     glyphs: Vec<(char, Vec<f32>)>,
 }
 
 impl GlyphMatcher {
+    /// Builds a glyph matcher.
+    ///
+    /// # Arguments
+    /// * `atlas` - the glyphs to choose from
+    ///
+    /// # Returns
+    /// The matcher.
     pub fn from_atlas(atlas: &Atlas) -> Self {
         let mut glyphs: Vec<(char, Vec<f32>)> = atlas
             .glyphs
@@ -93,6 +105,11 @@ impl GlyphMatcher {
 }
 
 impl GlyphMatcher {
+    /// Picks the glyph closest to each cell by sum of squared differences.
+    ///
+    /// # Arguments
+    /// * `buf` - the coverage buffer
+    /// * `grid` - receives the characters
     pub fn match_cells(&self, buf: &CoverageBuffer, grid: &mut CellGrid) {
         for_each_cell(buf, grid, self.sampling, |patch| {
             let mut best = (f32::INFINITY, ' ');
@@ -111,14 +128,19 @@ impl GlyphMatcher {
     }
 }
 
-/// Maps mean cell coverage onto glyphs ordered by ink.
 pub struct RampMatcher {
     sampling: [usize; 2],
-    /// (ink, char), ascending by ink then code point.
     ramp: Vec<(f32, char)>,
 }
 
 impl RampMatcher {
+    /// Builds a ramp matcher.
+    ///
+    /// # Arguments
+    /// * `atlas` - the glyphs to choose from
+    ///
+    /// # Returns
+    /// The matcher.
     pub fn from_atlas(atlas: &Atlas) -> Self {
         let mut ramp: Vec<(f32, char)> = atlas.glyphs.iter().map(|g| (g.ink, g.ch)).collect();
         ramp.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
@@ -130,6 +152,11 @@ impl RampMatcher {
 }
 
 impl RampMatcher {
+    /// Picks the glyph whose ink best matches each cell's mean coverage.
+    ///
+    /// # Arguments
+    /// * `buf` - the coverage buffer
+    /// * `grid` - receives the characters
     pub fn match_cells(&self, buf: &CoverageBuffer, grid: &mut CellGrid) {
         let max_ink = self.ramp.last().map_or(0.0, |r| r.0);
         for_each_cell(buf, grid, self.sampling, |patch| {
@@ -174,7 +201,6 @@ mod tests {
         let mut wrong = vec![];
         for g in &a.glyphs {
             m.match_cells(&patch_buf(&a, g.ch), &mut grid);
-            // Glyphs with identical bitmaps may legitimately resolve to the lowest code point.
             let got = grid.get(0, 0);
             let same = a.glyphs.iter().find(|x| x.ch == got).unwrap().coverage == g.coverage;
             if !same {

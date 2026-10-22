@@ -8,17 +8,21 @@ use fontdue::{Font, FontSettings};
 pub struct GenParams {
     pub font_bytes: Vec<u8>,
     pub font_size_px: f32,
-    /// Overrides the cell size derived from font metrics.
     pub cell_px: Option<[u32; 2]>,
-    /// Overrides the baseline derived from font metrics.
     pub baseline_px: Option<u32>,
     pub sampling: [u32; 2],
     pub palette: Palette,
     pub deny: DenyList,
 }
 
-/// Cell size and baseline (pixels from the top) as a terminal would lay out
-/// `font` at `size_px`: whole-pixel advance and line height.
+/// Lays out a terminal cell the way a terminal would for this font.
+///
+/// # Arguments
+/// * `font` - the font
+/// * `size_px` - font size in pixels
+///
+/// # Returns
+/// The cell size in whole pixels and the baseline's distance from the top.
 fn cell_metrics(font: &Font, size_px: f32) -> ([u32; 2], u32) {
     let width = font.metrics('M', size_px).advance_width.ceil() as u32;
     let (height, baseline) = match font.horizontal_line_metrics(size_px) {
@@ -31,7 +35,13 @@ fn cell_metrics(font: &Font, size_px: f32) -> ([u32; 2], u32) {
     ([width.max(1), height.max(1)], baseline)
 }
 
-/// Fails if any palette character is denied or missing from the font.
+/// Builds an atlas from a font.
+///
+/// # Arguments
+/// * `p` - the font, size, sampling, palette and denylist
+///
+/// # Returns
+/// The atlas, or an error if a palette character is denied or missing from the font.
 pub fn generate(p: &GenParams) -> anyhow::Result<Atlas> {
     let font = Font::from_bytes(p.font_bytes.as_slice(), FontSettings::default())
         .map_err(|e| anyhow!("loading font: {e}"))?;
@@ -83,7 +93,17 @@ pub fn generate(p: &GenParams) -> anyhow::Result<Atlas> {
     })
 }
 
-/// Rasterizes `ch` into a `cell_px` canvas of coverage values in 0..1.
+/// Rasterizes one character into a cell.
+///
+/// # Arguments
+/// * `font` - the font
+/// * `ch` - the character
+/// * `size_px` - font size in pixels
+/// * `cell_px` - cell size in pixels
+/// * `baseline_px` - baseline distance from the top of the cell
+///
+/// # Returns
+/// Coverage values in 0..1 for each pixel of the cell, row-major.
 fn render_cell(
     font: &Font,
     ch: char,
@@ -108,7 +128,15 @@ fn render_cell(
     canvas
 }
 
-/// Area-averages a `src_size` canvas into `dst_size` samples.
+/// Area-averages an image down to a lower resolution.
+///
+/// # Arguments
+/// * `src` - source values, row-major
+/// * `src_size` - source width and height
+/// * `dst_size` - output width and height
+///
+/// # Returns
+/// The output values, row-major.
 fn downsample(src: &[f32], src_size: [u32; 2], dst_size: [u32; 2]) -> Vec<f32> {
     let [sw, sh] = src_size.map(|v| v as usize);
     let [dw, dh] = dst_size.map(|v| v as usize);

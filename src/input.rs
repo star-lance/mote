@@ -9,7 +9,6 @@ use serde::Deserialize;
 
 use crate::config::KeyConfig;
 
-/// Terminal input, normalized.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Key(KeyEvent),
@@ -32,7 +31,6 @@ pub enum Event {
         col: u16,
         row: u16,
     },
-    /// `delta` is -1 for up, +1 for down.
     Scroll {
         col: u16,
         row: u16,
@@ -45,6 +43,13 @@ pub enum Event {
     },
 }
 
+/// Converts a crossterm event.
+///
+/// # Arguments
+/// * `ev` - the raw terminal event
+///
+/// # Returns
+/// The matching `Event`, or `None` for events mote ignores.
 pub fn from_crossterm(ev: ct::Event) -> Option<Event> {
     Some(match ev {
         ct::Event::Key(k) if k.kind != KeyEventKind::Release => Event::Key(k),
@@ -70,7 +75,6 @@ pub fn from_crossterm(ev: ct::Event) -> Option<Event> {
     })
 }
 
-/// A key plus modifiers, written in config as e.g. `"q"`, `"f2"` or `"ctrl+x"`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(try_from = "String")]
 pub struct KeyBinding {
@@ -94,8 +98,13 @@ impl KeyBinding {
         }
     }
 
-    /// Parses `"q"`, `"esc"`, `"tab"`, `"enter"`, `"f1"`..`"f12"`, with optional
-    /// `ctrl+` / `alt+` prefixes. Case-insensitive.
+    /// Parses a key name such as `q`, `esc`, `f2` or `ctrl+x`.
+    ///
+    /// # Arguments
+    /// * `s` - the key name, case-insensitive
+    ///
+    /// # Returns
+    /// The binding, or an error for an unknown key.
     pub fn parse(s: &str) -> anyhow::Result<KeyBinding> {
         let lower = s.trim().to_lowercase();
         let mut mods = KeyModifiers::NONE;
@@ -131,6 +140,13 @@ impl KeyBinding {
         Ok(KeyBinding { code, mods })
     }
 
+    /// Checks a key press against this binding, ignoring Shift.
+    ///
+    /// # Arguments
+    /// * `k` - the key event
+    ///
+    /// # Returns
+    /// `true` if the key and modifiers match.
     pub fn matches(&self, k: &KeyEvent) -> bool {
         let code = match k.code {
             KeyCode::Char(c) => KeyCode::Char(c.to_ascii_lowercase()),
@@ -146,7 +162,6 @@ pub enum Focus {
     Scene,
 }
 
-/// Who handles an event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Route {
     Quit,
@@ -158,7 +173,16 @@ pub enum Route {
     Scene,
 }
 
-/// Decides who handles `ev`. `login_rect` is `None` when no login panel is shown.
+/// Decides who handles an event.
+///
+/// # Arguments
+/// * `ev` - the event
+/// * `focus` - whether the login panel or the scene has keyboard focus
+/// * `keys` - the configured key bindings
+/// * `login_rect` - the login panel's area, or `None` when it isn't shown
+///
+/// # Returns
+/// The action to take or the target that receives the event.
 pub fn route(ev: &Event, focus: Focus, keys: &KeyConfig, login_rect: Option<Rect>) -> Route {
     let focused = if login_rect.is_some() && focus == Focus::Login {
         Route::Login

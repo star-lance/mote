@@ -4,8 +4,6 @@ use std::ops::RangeInclusive;
 
 use anyhow::{anyhow, bail};
 
-/// Ranges that are never output: Block Elements and the Private Use Areas
-/// (which hold Nerd Font icons).
 pub const BUILTIN_DENY: &[RangeInclusive<u32>] = &[
     0x2580..=0x259F,
     0xE000..=0xF8FF,
@@ -13,19 +11,31 @@ pub const BUILTIN_DENY: &[RangeInclusive<u32>] = &[
     0x100000..=0x10FFFD,
 ];
 
-/// Characters that must never appear in output.
 #[derive(Debug, Clone)]
 pub struct DenyList {
     ranges: Vec<RangeInclusive<u32>>,
 }
 
 impl DenyList {
-    /// The built-in ranges plus `extra`.
+    /// Builds a denylist from the built-in ranges plus extra ones.
+    ///
+    /// # Arguments
+    /// * `extra` - additional code point ranges to deny
+    ///
+    /// # Returns
+    /// The combined denylist.
     pub fn new(extra: &[RangeInclusive<u32>]) -> Self {
         let ranges = BUILTIN_DENY.iter().chain(extra).cloned().collect();
         Self { ranges }
     }
 
+    /// Checks whether a character may not be output.
+    ///
+    /// # Arguments
+    /// * `c` - the character to check
+    ///
+    /// # Returns
+    /// `true` if `c` falls in a denied range.
     pub fn is_denied(&self, c: char) -> bool {
         let c = c as u32;
         self.ranges.iter().any(|r| r.contains(&c))
@@ -37,7 +47,13 @@ fn parse_code_point(s: &str) -> Option<u32> {
     u32::from_str_radix(hex, 16).ok()
 }
 
-/// Parses `"U+2588"` or `"U+2580-U+259F"`.
+/// Parses a code point range.
+///
+/// # Arguments
+/// * `s` - `U+XXXX` or `U+XXXX-U+YYYY`
+///
+/// # Returns
+/// The inclusive range, or an error if it is malformed or reversed.
 pub fn parse_range(s: &str) -> anyhow::Result<RangeInclusive<u32>> {
     let s = s.trim();
     let (lo, hi) = match s.split_once('-') {
@@ -52,22 +68,25 @@ pub fn parse_range(s: &str) -> anyhow::Result<RangeInclusive<u32>> {
     }
 }
 
-/// The set of characters the matcher chooses from, sorted by code point.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Palette {
     chars: Vec<char>,
 }
 
 impl Palette {
-    /// Printable ASCII, U+0020 through U+007E.
     pub fn ascii95() -> Self {
         Self {
             chars: (' '..='~').collect(),
         }
     }
 
-    /// `"ascii95"` selects [`Palette::ascii95`]; any other string is taken as
-    /// the literal set of characters.
+    /// Builds a palette from its config value.
+    ///
+    /// # Arguments
+    /// * `spec` - `"ascii95"` or a literal string of characters
+    ///
+    /// # Returns
+    /// The sorted, de-duplicated palette, or an error if it is empty.
     pub fn parse(spec: &str) -> anyhow::Result<Self> {
         if spec == "ascii95" {
             return Ok(Self::ascii95());
@@ -85,6 +104,13 @@ impl Palette {
         &self.chars
     }
 
+    /// Checks the palette against a denylist.
+    ///
+    /// # Arguments
+    /// * `deny` - characters that may not be output
+    ///
+    /// # Returns
+    /// An error listing any denied characters in the palette.
     pub fn validate(&self, deny: &DenyList) -> anyhow::Result<()> {
         let denied: Vec<char> = self
             .chars

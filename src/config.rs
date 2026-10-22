@@ -41,7 +41,6 @@ impl Default for Config {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct RenderConfig {
-    /// Line thickness in sub-cell samples.
     pub line_thickness: f32,
     pub feature_edge_angle_deg: f32,
 }
@@ -84,7 +83,6 @@ pub struct GlyphConfig {
     pub palette: String,
     pub deny: Vec<String>,
     pub atlas: Option<PathBuf>,
-    /// The font the terminal uses; only checked against the atlas hash.
     pub font: Option<PathBuf>,
 }
 
@@ -167,10 +165,8 @@ impl Default for CameraConfig {
 pub struct ObjectConfig {
     pub mesh: MeshKind,
     pub position: [f32; 3],
-    /// Euler angles in degrees, XYZ order.
     pub rotation: [f32; 3],
     pub scale: f32,
-    /// Degrees per second around X, Y, Z.
     pub spin: [f32; 3],
 }
 
@@ -283,7 +279,6 @@ impl Default for KeyConfig {
     }
 }
 
-/// Palette and denylist after validation.
 #[derive(Debug, Clone)]
 pub struct ValidatedGlyphs {
     pub palette: Palette,
@@ -291,6 +286,10 @@ pub struct ValidatedGlyphs {
 }
 
 impl Config {
+    /// Checks settings the types can't express and builds the glyph sets.
+    ///
+    /// # Returns
+    /// The palette and denylist, or an error naming the first invalid setting.
     pub fn validate(&self) -> anyhow::Result<ValidatedGlyphs> {
         if self.fps == 0 {
             bail!("fps must be at least 1");
@@ -328,6 +327,13 @@ impl Config {
     }
 }
 
+/// Parses config text.
+///
+/// # Arguments
+/// * `s` - TOML text
+///
+/// # Returns
+/// The config and the paths of any unknown keys.
 pub(crate) fn load_str(s: &str) -> anyhow::Result<(Config, Vec<String>)> {
     let value: toml::Value = toml::from_str(s).context("parsing config")?;
     let mut warnings = Vec::new();
@@ -344,9 +350,13 @@ fn default_path() -> Option<PathBuf> {
     Some(base.join("mote").join("config.toml"))
 }
 
-/// Loads `path`, or the default location when `None`. A missing default file
-/// yields the defaults; a missing explicit path is an error. Returns the
-/// unknown keys as warnings.
+/// Loads the config file.
+///
+/// # Arguments
+/// * `path` - file to read, or `None` for `$XDG_CONFIG_HOME/mote/config.toml`
+///
+/// # Returns
+/// The config and the paths of any unknown keys; defaults if the default file doesn't exist.
 pub fn load(path: Option<&Path>) -> anyhow::Result<(Config, Vec<String>)> {
     let path = match path {
         Some(p) => p.to_path_buf(),

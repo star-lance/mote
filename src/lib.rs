@@ -1,3 +1,5 @@
+//! Library shared by the mote and glyphgen binaries.
+
 pub mod app;
 pub mod atlas;
 pub mod atlas_gen;

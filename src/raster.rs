@@ -5,7 +5,6 @@ use glam::{DVec2, Vec2};
 use crate::geom::{Viewport, project_segment};
 use crate::scene::Scene;
 
-/// Coverage values in 0..1, one per sub-cell sample, row-major.
 #[derive(Debug, Clone)]
 pub struct CoverageBuffer {
     pub width: usize,
@@ -37,7 +36,12 @@ impl CoverageBuffer {
         self.data[y * self.width + x]
     }
 
-    /// Raises the sample to `v` if `v` is larger. Out-of-bounds is ignored.
+    /// Raises a sample to `v` if it is lower.
+    ///
+    /// # Arguments
+    /// * `x` - column; out of bounds is ignored
+    /// * `y` - row; out of bounds is ignored
+    /// * `v` - coverage in 0..1
     pub fn blend_max(&mut self, x: i64, y: i64, v: f32) {
         if x < 0 || y < 0 || x as usize >= self.width || y as usize >= self.height {
             return;
@@ -47,21 +51,22 @@ impl CoverageBuffer {
     }
 }
 
-/// Draws every feature edge as an anti-aliased line, see-through.
 #[derive(Debug, Clone, Copy)]
 pub struct WireframeRasterizer {
-    /// Line thickness in samples.
     pub thickness: f32,
 }
 
 impl WireframeRasterizer {
-    /// Coverage per sample is `clamp(thickness/2 + 0.5 - d, 0, 1)`, where `d` is
-    /// the distance from the sample center to the segment.
+    /// Draws an anti-aliased line.
+    ///
+    /// # Arguments
+    /// * `buf` - the buffer to draw into
+    /// * `a` - first endpoint in sample coordinates
+    /// * `b` - second endpoint in sample coordinates
     pub fn draw_line(&self, buf: &mut CoverageBuffer, a: Vec2, b: Vec2) {
         let (a, b) = (a.as_dvec2(), b.as_dvec2());
         let half = self.thickness as f64 / 2.0;
         let pad = half + 1.0;
-        // Clip the bounding box to the buffer first so huge coordinates stay cheap.
         let x0 = (a.x.min(b.x) - pad).floor().max(0.0);
         let y0 = (a.y.min(b.y) - pad).floor().max(0.0);
         let x1 = (a.x.max(b.x) + pad).ceil().min(buf.width as f64);
@@ -83,6 +88,12 @@ impl WireframeRasterizer {
         }
     }
 
+    /// Draws every wireframe edge of every object.
+    ///
+    /// # Arguments
+    /// * `scene` - the scene
+    /// * `vp` - the render target
+    /// * `buf` - the buffer to draw into
     pub fn rasterize(&self, scene: &Scene, vp: &Viewport, buf: &mut CoverageBuffer) {
         let view = scene.camera.view();
         for obj in &scene.objects {
@@ -108,8 +119,17 @@ impl WireframeRasterizer {
     }
 }
 
-/// Distance from `p` to segment `ab`; uses the perpendicular form inside the
-/// segment so long segments stay precise.
+/// Measures the distance from a point to a segment.
+///
+/// # Arguments
+/// * `p` - the point
+/// * `a` - segment start
+/// * `b` - segment end
+/// * `ab` - `b - a`
+/// * `len` - length of `ab`
+///
+/// # Returns
+/// The distance.
 fn segment_distance(p: DVec2, a: DVec2, b: DVec2, ab: DVec2, len: f64) -> f64 {
     if len == 0.0 {
         return p.distance(a);

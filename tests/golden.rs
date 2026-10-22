@@ -1,5 +1,4 @@
-//! Golden frames: fixed scenes rendered to text and compared with snapshots.
-//! Regenerate with `UPDATE_GOLDEN=1 cargo test --test golden`.
+//! Golden frame tests; regenerate with `UPDATE_GOLDEN=1 cargo test --test golden`.
 
 use std::path::PathBuf;
 

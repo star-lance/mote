@@ -19,7 +19,15 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    /// The matchers only ever choose characters from `palette`.
+    /// Builds a renderer.
+    ///
+    /// # Arguments
+    /// * `cfg` - render and matcher settings
+    /// * `atlas` - glyph bitmaps
+    /// * `palette` - characters the output may use
+    ///
+    /// # Returns
+    /// The renderer.
     pub fn new(cfg: &Config, atlas: &Atlas, palette: &Palette) -> Self {
         let atlas = atlas.subset(palette);
         Self {
@@ -35,8 +43,16 @@ impl Renderer {
         }
     }
 
-    /// Renders `scene` to a `cols` × `rows` grid. `cell_aspect` is the
-    /// terminal cell's pixel width / height.
+    /// Renders the scene to characters.
+    ///
+    /// # Arguments
+    /// * `scene` - the scene
+    /// * `cols` - grid width
+    /// * `rows` - grid height
+    /// * `cell_aspect` - a cell's pixel width divided by its height
+    ///
+    /// # Returns
+    /// The character grid.
     pub fn render(&mut self, scene: &Scene, cols: u16, rows: u16, cell_aspect: f32) -> &CellGrid {
         let (cols, rows) = (cols as usize, rows as usize);
         let [sw, sh] = self.sampling;

@@ -16,6 +16,13 @@ pub struct Camera {
 const MAX_PITCH: f32 = 89.0 * std::f32::consts::PI / 180.0;
 
 impl Camera {
+    /// Builds a camera from config.
+    ///
+    /// # Arguments
+    /// * `c` - position, target and field of view
+    ///
+    /// # Returns
+    /// The camera.
     pub fn from_config(c: &CameraConfig) -> Camera {
         Camera {
             position: Vec3::from(c.position),
@@ -30,7 +37,11 @@ impl Camera {
         glam::camera::rh::view::look_at_mat4(self.position, self.target, self.up)
     }
 
-    /// Rotates the camera around its target; pitch is clamped to ±89°.
+    /// Rotates the camera around its target.
+    ///
+    /// # Arguments
+    /// * `yaw_rad` - rotation around the up axis
+    /// * `pitch_rad` - rotation up or down, clamped to ±89°
     pub fn orbit(&mut self, yaw_rad: f32, pitch_rad: f32) {
         let offset = self.position - self.target;
         let r = offset.length();
@@ -48,7 +59,10 @@ impl Camera {
             );
     }
 
-    /// Scales the distance to the target by `factor`.
+    /// Moves the camera toward or away from its target.
+    ///
+    /// # Arguments
+    /// * `factor` - multiplier for the distance to the target
     pub fn dolly(&mut self, factor: f32) {
         let offset = self.position - self.target;
         let dist = (offset.length() * factor).max(self.near * 2.0);
@@ -56,17 +70,24 @@ impl Camera {
     }
 }
 
-/// The render target in sub-cell samples.
 #[derive(Debug, Clone, Copy)]
 pub struct Viewport {
     pub width: f32,
     pub height: f32,
-    /// Physical width / height of one sample.
     pub sample_aspect: f32,
 }
 
-/// Projects a world-space segment into sample coordinates (x right, y down),
-/// clipped against the near plane. `None` if it lies entirely behind it.
+/// Projects a world-space segment into sample coordinates.
+///
+/// # Arguments
+/// * `view` - the camera's view matrix
+/// * `cam` - the camera
+/// * `vp` - the render target
+/// * `a` - first endpoint
+/// * `b` - second endpoint
+///
+/// # Returns
+/// The endpoints (x right, y down) clipped to the near plane, or `None` if the segment is behind the camera.
 pub fn project_segment(
     view: &Mat4,
     cam: &Camera,

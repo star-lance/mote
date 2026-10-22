@@ -2,7 +2,6 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-/// Single-line text. `cursor` counts chars, not bytes, so multi-byte input is safe.
 #[derive(Clone, Default)]
 pub struct TextInput {
     value: String,
@@ -43,7 +42,10 @@ impl TextInput {
         self.value.chars().count()
     }
 
-    /// Inserts at the cursor, dropping control characters.
+    /// Inserts text at the cursor, dropping control characters.
+    ///
+    /// # Arguments
+    /// * `s` - the text
     pub fn insert_str(&mut self, s: &str) {
         for c in s.chars().filter(|c| !c.is_control()) {
             let at = self.byte_index(self.cursor);
@@ -52,7 +54,13 @@ impl TextInput {
         }
     }
 
-    /// Applies an editing key. Returns true when Enter was pressed.
+    /// Applies an editing key.
+    ///
+    /// # Arguments
+    /// * `k` - the key event
+    ///
+    /// # Returns
+    /// `true` if Enter was pressed.
     pub fn handle_key(&mut self, k: &KeyEvent) -> bool {
         if k.modifiers
             .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
@@ -80,7 +88,10 @@ impl TextInput {
         false
     }
 
-    /// The text as shown: one `*` per char when masked.
+    /// Formats the field for display.
+    ///
+    /// # Returns
+    /// The text, or one `*` per character when masked.
     pub fn display(&self) -> String {
         if self.masked {
             "*".repeat(self.len())

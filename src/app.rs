@@ -18,7 +18,14 @@ use crate::ui::find_denied;
 use crate::ui::login::{LoginPanel, authenticate, panel_rect};
 use crate::ui::scene_view::SceneView;
 
-/// Cell width / height: measured if the terminal reports pixels, else the atlas's.
+/// Works out the cell shape for projection.
+///
+/// # Arguments
+/// * `measured` - cell size reported by the terminal, if any
+/// * `atlas` - fallback cell size
+///
+/// # Returns
+/// Cell width divided by height.
 pub fn effective_cell_aspect(measured: Option<[u16; 2]>, atlas: &Atlas) -> f32 {
     match measured {
         Some([w, h]) if w > 0 && h > 0 => w as f32 / h as f32,
@@ -26,6 +33,15 @@ pub fn effective_cell_aspect(measured: Option<[u16; 2]>, atlas: &Atlas) -> f32 {
     }
 }
 
+/// Runs mote until the user quits.
+///
+/// # Arguments
+/// * `cfg` - the config
+/// * `glyphs` - the validated palette and denylist
+/// * `atlas` - glyph bitmaps
+///
+/// # Returns
+/// An error if the terminal fails.
 pub fn run(cfg: Config, glyphs: ValidatedGlyphs, atlas: Atlas) -> anyhow::Result<()> {
     let mut terminal = term::setup().context("setting up terminal")?;
     let result = App::new(cfg, glyphs, atlas).run(&mut terminal);
@@ -75,12 +91,18 @@ impl App {
         }
     }
 
+    /// Runs the frame loop.
+    ///
+    /// # Arguments
+    /// * `terminal` - the terminal to draw to
+    ///
+    /// # Returns
+    /// An error if the terminal fails.
     fn run(&mut self, terminal: &mut Term) -> anyhow::Result<()> {
         let period = Duration::from_secs_f64(1.0 / self.cfg.fps as f64);
         let mut next_frame = Instant::now();
         let mut last_update = Instant::now();
         loop {
-            // Handle input until it is time for the next frame.
             while event::poll(next_frame.saturating_duration_since(Instant::now()))? {
                 let Some(ev) = from_crossterm(event::read()?) else {
                     continue;
@@ -114,7 +136,14 @@ impl App {
             .and_then(|_| panel_rect(screen, self.cfg.ui.login.position))
     }
 
-    /// Returns false when the app should quit.
+    /// Dispatches an input event.
+    ///
+    /// # Arguments
+    /// * `ev` - the event
+    /// * `screen` - the current screen area
+    ///
+    /// # Returns
+    /// `false` when the app should quit.
     fn handle_event(&mut self, ev: &Event, screen: Rect) -> bool {
         if let Event::Resize { .. } = ev {
             self.cell_px = term::cell_pixel_size();
@@ -147,6 +176,13 @@ impl App {
         true
     }
 
+    /// Renders and draws one frame.
+    ///
+    /// # Arguments
+    /// * `terminal` - the terminal to draw to
+    ///
+    /// # Returns
+    /// An error if the terminal fails.
     fn draw(&mut self, terminal: &mut Term) -> anyhow::Result<()> {
         let size = terminal.size()?;
         let screen = Rect::new(0, 0, size.width, size.height);

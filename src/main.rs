@@ -1,4 +1,4 @@
-//! mote: an ASCII wireframe renderer with a stand-in login panel.
+//! mote: an ASCII wireframe renderer with a login panel.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -16,6 +16,13 @@ struct Args {
     config: Option<PathBuf>,
 }
 
+/// Loads the config and atlas, then starts the app.
+///
+/// # Arguments
+/// * `args` - command-line arguments
+///
+/// # Returns
+/// An error for invalid config, a mismatched atlas, or a terminal failure.
 fn run(args: Args) -> anyhow::Result<()> {
     let (cfg, warnings) = config::load(args.config.as_deref())?;
     for key in warnings {

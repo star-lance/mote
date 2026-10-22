@@ -1,4 +1,4 @@
-//! The stand-in login panel and the authentication boundary.
+//! The login panel and its authentication hook.
 
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::KeyCode;
@@ -19,13 +19,18 @@ pub enum AuthError {
     NotImplemented,
 }
 
-/// The authentication boundary. A real implementation (PAM/greetd) replaces this.
+/// Checks a username and password.
+///
+/// # Arguments
+/// * `_username` - the user name
+/// * `_password` - the password
+///
+/// # Returns
+/// `Ok` on success; currently always `AuthError::NotImplemented`.
 pub fn authenticate(_username: &str, _password: &str) -> Result<(), AuthError> {
     Err(AuthError::NotImplemented)
 }
 
-/// Credentials from a submitted form. Deliberately not `Debug`, so the
-/// password can't end up in a log by accident.
 pub struct LoginSubmit {
     pub username: String,
     pub password: String,
@@ -46,7 +51,6 @@ pub struct LoginPanel {
     status: String,
 }
 
-/// ASCII fallback for when box-drawing characters are denied.
 const ASCII_BORDER: border::Set<'static> = border::Set {
     top_left: "+",
     top_right: "+",
@@ -61,7 +65,14 @@ const ASCII_BORDER: border::Set<'static> = border::Set {
 const PANEL_SIZE: (u16, u16) = (40, 8);
 const MIN_SIZE: (u16, u16) = (20, 5);
 
-/// Where the panel goes on `screen`, shrunk to fit; `None` if the screen is too small.
+/// Places the login panel.
+///
+/// # Arguments
+/// * `screen` - the full screen area
+/// * `pos` - where the panel goes
+///
+/// # Returns
+/// The panel's area, or `None` if the screen is smaller than 20x5.
 pub fn panel_rect(screen: Rect, pos: LoginPosition) -> Option<Rect> {
     if screen.width < MIN_SIZE.0 || screen.height < MIN_SIZE.1 {
         return None;
@@ -80,7 +91,13 @@ pub fn panel_rect(screen: Rect, pos: LoginPosition) -> Option<Rect> {
 }
 
 impl LoginPanel {
-    /// Characters in `deny` are never accepted as input or drawn.
+    /// Builds an empty login panel.
+    ///
+    /// # Arguments
+    /// * `deny` - characters never accepted as input or drawn
+    ///
+    /// # Returns
+    /// The panel.
     pub fn new(deny: DenyList) -> Self {
         let p = border::PLAIN;
         let box_chars = [
@@ -117,8 +134,13 @@ impl LoginPanel {
         self.status = s.into();
     }
 
-    /// Returns the credentials when the form is submitted; the password field
-    /// is cleared at that point.
+    /// Applies an input event to the form.
+    ///
+    /// # Arguments
+    /// * `ev` - the event
+    ///
+    /// # Returns
+    /// The credentials when the form is submitted; the password field is cleared then.
     pub fn handle_event(&mut self, ev: &Event) -> Option<LoginSubmit> {
         match ev {
             Event::Paste(s) => {
@@ -146,6 +168,13 @@ impl LoginPanel {
         None
     }
 
+    /// Draws the panel.
+    ///
+    /// # Arguments
+    /// * `area` - where to draw
+    /// * `buf` - the frame buffer
+    /// * `focused` - whether the panel has keyboard focus
+    /// * `colors` - UI colors
     pub fn render(&self, area: Rect, buf: &mut Buffer, focused: bool, colors: &ColorConfig) {
         let accent = colors.ui_accent;
         let base = Style::default().fg(colors.ui_fg).bg(colors.bg);
@@ -186,7 +215,16 @@ impl LoginPanel {
     }
 }
 
-/// The visible window of a field, with the cursor cell reversed when active.
+/// Lays out the visible part of a field.
+///
+/// # Arguments
+/// * `input` - the field
+/// * `width` - columns available
+/// * `show_cursor` - whether to highlight the cursor cell
+/// * `style` - base text style
+///
+/// # Returns
+/// The spans to draw.
 fn field_spans(
     input: &TextInput,
     width: usize,

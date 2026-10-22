@@ -37,6 +37,13 @@ struct Args {
     out: PathBuf,
 }
 
+/// Parses a size written as `WxH`.
+///
+/// # Arguments
+/// * `s` - the size text
+///
+/// # Returns
+/// Width and height, or an error message.
 fn parse_pair(s: &str) -> Result<[u32; 2], String> {
     let (a, b) = s
         .split_once(['x', 'X'])
@@ -45,6 +52,13 @@ fn parse_pair(s: &str) -> Result<[u32; 2], String> {
     Ok([parse(a)?, parse(b)?])
 }
 
+/// Generates the atlas and prints a summary.
+///
+/// # Arguments
+/// * `args` - command-line arguments
+///
+/// # Returns
+/// An error if the font can't be read or used.
 fn run(args: Args) -> anyhow::Result<()> {
     let font_bytes =
         std::fs::read(&args.font).with_context(|| format!("reading {}", args.font.display()))?;

@@ -1,4 +1,4 @@
-//! The scene: objects in one shared world, one camera, and the input hook.
+//! Scene objects, their animation, and mouse camera controls.
 
 use glam::{EulerRot, Mat4, Quat, Vec3};
 use ratatui::crossterm::event::MouseButton;
@@ -14,11 +14,18 @@ pub struct SceneObject {
     pub position: Vec3,
     pub rotation: Quat,
     pub scale: f32,
-    /// Radians per second around X, Y, Z.
     pub spin: Vec3,
 }
 
 impl SceneObject {
+    /// Builds a scene object.
+    ///
+    /// # Arguments
+    /// * `c` - the object's config
+    /// * `edge_angle_deg` - angle threshold for wireframe edges
+    ///
+    /// # Returns
+    /// The object with its edges precomputed.
     pub fn from_config(c: &ObjectConfig, edge_angle_deg: f32) -> SceneObject {
         let mesh = Mesh::from_kind(&c.mesh);
         let edges = feature_edges(&mesh, edge_angle_deg);
@@ -45,6 +52,14 @@ pub struct Scene {
 }
 
 impl Scene {
+    /// Builds the scene.
+    ///
+    /// # Arguments
+    /// * `c` - camera and object config
+    /// * `edge_angle_deg` - angle threshold for wireframe edges
+    ///
+    /// # Returns
+    /// The scene.
     pub fn from_config(c: &SceneConfig, edge_angle_deg: f32) -> Scene {
         Scene {
             camera: Camera::from_config(&c.camera),
@@ -56,7 +71,10 @@ impl Scene {
         }
     }
 
-    /// Advances object spin by `dt` seconds.
+    /// Advances each object's spin.
+    ///
+    /// # Arguments
+    /// * `dt` - elapsed time in seconds
     pub fn update(&mut self, dt: f32) {
         for o in &mut self.objects {
             let step = o.spin * dt;
@@ -66,7 +84,6 @@ impl Scene {
     }
 }
 
-/// Default input wiring: left-drag orbits the camera, scroll zooms.
 #[derive(Debug, Default)]
 pub struct CameraControls {
     drag_from: Option<(u16, u16)>,
@@ -75,6 +92,11 @@ pub struct CameraControls {
 const ORBIT_RAD_PER_CELL: f32 = 0.05;
 
 impl CameraControls {
+    /// Applies mouse input to the camera: drag orbits, scroll zooms.
+    ///
+    /// # Arguments
+    /// * `ev` - the input event
+    /// * `camera` - the camera to move
     pub fn handle_event(&mut self, ev: &Event, camera: &mut Camera) {
         match *ev {
             Event::MouseDown {

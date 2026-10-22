@@ -7,7 +7,6 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
-# A private per-user directory: never a shared, guessable path in /tmp.
 if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
     CONF_DIR="$XDG_RUNTIME_DIR/mote"
 else

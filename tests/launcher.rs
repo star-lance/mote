@@ -1,5 +1,4 @@
-//! Runs scripts/mote-launch against a stub `kitty` to check where and how it
-//! writes its fontconfig file.
+//! Tests for the font config that scripts/mote-launch writes.
 
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
@@ -19,7 +18,6 @@ fn uid() -> String {
         .to_string()
 }
 
-/// Installs a stub kitty that records FONTCONFIG_FILE and returns (bin dir, record file).
 fn stub_kitty(dir: &Path) -> (PathBuf, PathBuf) {
     let bin = dir.join("bin");
     std::fs::create_dir_all(&bin).unwrap();

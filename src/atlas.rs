@@ -10,7 +10,13 @@ use crate::glyphs::Palette;
 
 pub const ATLAS_VERSION: u32 = 1;
 
-/// Lowercase hex SHA-256, used to identify font files.
+/// Hashes bytes with SHA-256.
+///
+/// # Arguments
+/// * `bytes` - the data to hash
+///
+/// # Returns
+/// The digest as lowercase hex.
 pub fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -22,7 +28,6 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 pub struct Atlas {
     pub version: u32,
     pub font_name: String,
-    /// Lowercase hex SHA-256 of the font file.
     pub font_sha256: String,
     pub font_size_px: f32,
     pub cell_px: [u32; 2],
@@ -34,13 +39,18 @@ pub struct Atlas {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct AtlasGlyph {
     pub ch: char,
-    /// `sampling[0] * sampling[1]` values, row-major, 0..=255.
     pub coverage: Vec<u8>,
-    /// Mean coverage, 0..1.
     pub ink: f32,
 }
 
 impl Atlas {
+    /// Parses and checks an atlas.
+    ///
+    /// # Arguments
+    /// * `s` - atlas JSON
+    ///
+    /// # Returns
+    /// The atlas, or an error for an unsupported version or wrongly sized bitmaps.
     pub fn from_json(s: &str) -> anyhow::Result<Atlas> {
         let atlas: Atlas = serde_json::from_str(s).context("parsing atlas")?;
         if atlas.version != ATLAS_VERSION {
@@ -63,19 +73,33 @@ impl Atlas {
         Ok(atlas)
     }
 
+    /// Serializes the atlas.
+    ///
+    /// # Returns
+    /// Pretty-printed JSON ending in a newline.
     pub fn to_json(&self) -> String {
         let mut s = serde_json::to_string_pretty(self).expect("atlas serializes");
         s.push('\n');
         s
     }
 
+    /// Reads an atlas file.
+    ///
+    /// # Arguments
+    /// * `path` - the JSON file
+    ///
+    /// # Returns
+    /// The atlas, or an error if it can't be read or parsed.
     pub fn load(path: &Path) -> anyhow::Result<Atlas> {
         let text =
             std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
         Self::from_json(&text).with_context(|| format!("in {}", path.display()))
     }
 
-    /// The atlas bundled with the binary (Ioskeley Mono Regular, ASCII-95).
+    /// Loads the atlas built into the binary.
+    ///
+    /// # Returns
+    /// The Ioskeley Mono Regular atlas for printable ASCII.
     pub fn embedded_default() -> Atlas {
         Self::from_json(include_str!("../assets/atlas/default.json"))
             .expect("bundled atlas is valid")
@@ -85,7 +109,13 @@ impl Atlas {
         self.glyphs.iter().map(|g| g.ch).collect()
     }
 
-    /// A copy holding only the glyphs whose character is in `palette`.
+    /// Restricts the atlas to a palette.
+    ///
+    /// # Arguments
+    /// * `palette` - the characters to keep
+    ///
+    /// # Returns
+    /// A copy containing only glyphs in `palette`.
     pub fn subset(&self, palette: &Palette) -> Atlas {
         let glyphs = self
             .glyphs
@@ -99,7 +129,6 @@ impl Atlas {
         }
     }
 
-    /// Cell width divided by cell height, in pixels.
     pub fn cell_aspect(&self) -> f32 {
         self.cell_px[0] as f32 / self.cell_px[1] as f32
     }
