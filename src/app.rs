@@ -242,11 +242,48 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     #[test]
     fn zero_pixel_size_falls_back_to_atlas() {
         let a = Atlas::embedded_default();
         assert_eq!(effective_cell_aspect(None, &a), a.cell_aspect());
         assert_eq!(effective_cell_aspect(Some([10, 20]), &a), 0.5);
+    }
+
+    const SCREEN: Rect = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 24,
+    };
+
+    fn app() -> App {
+        let cfg = Config::default();
+        let glyphs = cfg.validate().unwrap();
+        App::new(cfg, glyphs, Atlas::embedded_default())
+    }
+
+    fn key(code: KeyCode) -> Event {
+        Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
+    }
+
+    #[test]
+    fn f2_toggles_matcher_mode() {
+        let mut a = app();
+        assert!(a.handle_event(&key(KeyCode::F(2)), SCREEN));
+        assert_eq!(a.renderer.mode, MatcherMode::Ramp);
+        a.handle_event(&key(KeyCode::F(2)), SCREEN);
+        assert_eq!(a.renderer.mode, MatcherMode::Match);
+    }
+
+    #[test]
+    fn q_types_into_login_and_quits_from_scene() {
+        let mut a = app();
+        assert_eq!(a.focus, Focus::Login);
+        assert!(a.handle_event(&key(KeyCode::Char('q')), SCREEN));
+        a.handle_event(&key(KeyCode::Esc), SCREEN);
+        assert_eq!(a.focus, Focus::Scene);
+        assert!(!a.handle_event(&key(KeyCode::Char('q')), SCREEN));
     }
 }

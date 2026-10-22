@@ -447,4 +447,14 @@ mod tests {
     fn missing_explicit_path_errors() {
         assert!(load(Some(Path::new("/nonexistent/mote.toml"))).is_err());
     }
+
+    #[test]
+    fn load_reads_a_file() {
+        let path =
+            std::env::temp_dir().join(format!("mote-config-test-{}.toml", std::process::id()));
+        std::fs::write(&path, "fps = 12\n").unwrap();
+        let (c, _) = load(Some(&path)).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(c.fps, 12);
+    }
 }

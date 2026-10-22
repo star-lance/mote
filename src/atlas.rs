@@ -144,4 +144,22 @@ mod tests {
         assert_eq!(a.glyphs.len(), 95);
         assert_eq!(a.sampling, [8, 16]);
     }
+
+    #[test]
+    fn load_round_trips_through_a_file() {
+        let a = Atlas::embedded_default();
+        let path =
+            std::env::temp_dir().join(format!("mote-atlas-test-{}.json", std::process::id()));
+        std::fs::write(&path, a.to_json()).unwrap();
+        let loaded = Atlas::load(&path);
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(loaded.unwrap(), a);
+    }
+
+    #[test]
+    fn rejects_wrongly_sized_bitmaps() {
+        let mut a = Atlas::embedded_default();
+        a.glyphs[0].coverage.pop();
+        assert!(Atlas::from_json(&a.to_json()).is_err());
+    }
 }

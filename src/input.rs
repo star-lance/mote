@@ -221,6 +221,7 @@ pub fn route(ev: &Event, focus: Focus, keys: &KeyConfig, login_rect: Option<Rect
 mod tests {
     use super::*;
     use crate::config::KeyConfig;
+    use ratatui::crossterm::event::MouseEvent;
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton};
     use ratatui::layout::Rect;
 
@@ -340,5 +341,41 @@ mod tests {
         );
         assert!(KeyBinding::parse("F12").is_ok());
         assert!(KeyBinding::parse("hyper+q").is_err());
+    }
+
+    #[test]
+    fn from_crossterm_maps_mouse_and_paste_and_ignores_releases() {
+        let mouse = |kind| {
+            ct::Event::Mouse(MouseEvent {
+                kind,
+                column: 3,
+                row: 4,
+                modifiers: KeyModifiers::NONE,
+            })
+        };
+        assert_eq!(
+            from_crossterm(mouse(MouseEventKind::Down(MouseButton::Left))),
+            Some(Event::MouseDown {
+                col: 3,
+                row: 4,
+                button: MouseButton::Left
+            })
+        );
+        assert_eq!(
+            from_crossterm(mouse(MouseEventKind::ScrollUp)),
+            Some(Event::Scroll {
+                col: 3,
+                row: 4,
+                delta: -1
+            })
+        );
+        assert_eq!(
+            from_crossterm(ct::Event::Paste("x".into())),
+            Some(Event::Paste("x".into()))
+        );
+        let mut release = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
+        release.kind = KeyEventKind::Release;
+        assert_eq!(from_crossterm(ct::Event::Key(release)), None);
+        assert_eq!(from_crossterm(ct::Event::FocusGained), None);
     }
 }
