@@ -86,13 +86,29 @@ impl Scene {
 
 #[derive(Debug, Default)]
 pub struct CameraControls {
-    drag_from: Option<(u16, u16)>,
+    follow_mouse: bool,
+    last: Option<(u16, u16)>,
 }
 
 const ORBIT_RAD_PER_CELL: f32 = 0.05;
 
 impl CameraControls {
-    /// Applies mouse input to the camera: drag orbits, scroll zooms.
+    /// Builds camera controls.
+    ///
+    /// # Arguments
+    /// * `follow_mouse` - whether plain mouse movement orbits the camera
+    ///
+    /// # Returns
+    /// The controls.
+    pub fn new(follow_mouse: bool) -> Self {
+        Self {
+            follow_mouse,
+            last: None,
+        }
+    }
+
+    /// Applies mouse input to the camera: drag orbits, scroll zooms, and plain
+    /// movement orbits too when `follow_mouse` is set.
     ///
     /// # Arguments
     /// * `ev` - the input event
@@ -103,23 +119,31 @@ impl CameraControls {
                 col,
                 row,
                 button: MouseButton::Left,
-            } => self.drag_from = Some((col, row)),
+            } => self.last = Some((col, row)),
             Event::MouseDrag {
                 col,
                 row,
                 button: MouseButton::Left,
-            } => {
-                if let Some((c0, r0)) = self.drag_from {
-                    let dx = col as f32 - c0 as f32;
-                    let dy = row as f32 - r0 as f32;
-                    camera.orbit(-dx * ORBIT_RAD_PER_CELL, dy * ORBIT_RAD_PER_CELL);
-                }
-                self.drag_from = Some((col, row));
-            }
-            Event::MouseUp { .. } => self.drag_from = None,
+            } => self.orbit_to(col, row, camera),
+            Event::MouseMove { col, row } if self.follow_mouse => self.orbit_to(col, row, camera),
             Event::Scroll { delta, .. } => camera.dolly(if delta < 0 { 0.9 } else { 1.1 }),
             _ => {}
         }
+    }
+
+    /// Orbits the camera by the pointer's movement since the last event.
+    ///
+    /// # Arguments
+    /// * `col` - pointer column
+    /// * `row` - pointer row
+    /// * `camera` - the camera to move
+    fn orbit_to(&mut self, col: u16, row: u16, camera: &mut Camera) {
+        if let Some((c0, r0)) = self.last {
+            let dx = col as f32 - c0 as f32;
+            let dy = row as f32 - r0 as f32;
+            camera.orbit(-dx * ORBIT_RAD_PER_CELL, dy * ORBIT_RAD_PER_CELL);
+        }
+        self.last = Some((col, row));
     }
 }
 
@@ -166,6 +190,22 @@ mod tests {
             },
             &mut s.camera,
         );
+        assert!((s.camera.position - p0).length() > 0.1);
+    }
+
+    #[test]
+    fn mouse_movement_orbits_only_when_following() {
+        let mut s = Scene::from_config(&SceneConfig::default(), 1.0);
+        let p0 = s.camera.position;
+        let mut still = CameraControls::new(false);
+        still.handle_event(&Event::MouseMove { col: 10, row: 10 }, &mut s.camera);
+        still.handle_event(&Event::MouseMove { col: 20, row: 12 }, &mut s.camera);
+        assert_eq!(s.camera.position, p0);
+
+        let mut follow = CameraControls::new(true);
+        follow.handle_event(&Event::MouseMove { col: 10, row: 10 }, &mut s.camera);
+        assert_eq!(s.camera.position, p0);
+        follow.handle_event(&Event::MouseMove { col: 20, row: 12 }, &mut s.camera);
         assert!((s.camera.position - p0).length() > 0.1);
     }
 }

@@ -57,6 +57,9 @@ deny = ["U+2500-U+257F"]  # extra forbidden characters (block elements are alway
 [render]
 line_thickness = 1.5  # in sub-cell samples
 
+[scene]
+follow_mouse = false  # true: plain mouse movement orbits the camera, not just dragging
+
 [scene.camera]
 position = [0, 0, 6]
 fov_deg = 50
@@ -77,7 +80,7 @@ enabled = true
 position = "center"   # center | top | bottom
 ```
 
-Meshes: `tetrahedron`, `cube`, `octahedron`, `icosahedron`,
+Meshes: `tetrahedron`, `cube`, `octahedron`, `icosahedron`, `dodecahedron`,
 `torus` (`major`, `minor`, `segments`, `sides`), `sphere` (`segments`, `rings`).
 
 ## Using another font (glyphgen)

@@ -122,6 +122,7 @@ impl Default for ColorConfig {
 pub struct SceneConfig {
     pub camera: CameraConfig,
     pub objects: Vec<ObjectConfig>,
+    pub follow_mouse: bool,
 }
 
 impl Default for SceneConfig {
@@ -138,6 +139,7 @@ impl Default for SceneConfig {
                 spin: [20.0, 35.0, 0.0],
                 ..ObjectConfig::default()
             }],
+            follow_mouse: false,
         }
     }
 }
@@ -208,6 +210,7 @@ pub enum MeshKind {
     Cube,
     Octahedron,
     Icosahedron,
+    Dodecahedron,
     Torus {
         #[serde(default = "default_major")]
         major: f32,
@@ -446,6 +449,17 @@ mod tests {
     #[test]
     fn missing_explicit_path_errors() {
         assert!(load(Some(Path::new("/nonexistent/mote.toml"))).is_err());
+    }
+
+    #[test]
+    fn dodecahedron_and_follow_mouse_parse() {
+        let (c, w) = parse(
+            "[scene]\nfollow_mouse = true\n[[scene.objects]]\nmesh = { type = \"dodecahedron\" }\n",
+        );
+        assert!(w.is_empty());
+        assert!(c.scene.follow_mouse);
+        assert_eq!(c.scene.objects[0].mesh, MeshKind::Dodecahedron);
+        assert!(!parse("").0.scene.follow_mouse);
     }
 
     #[test]

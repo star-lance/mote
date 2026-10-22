@@ -85,3 +85,15 @@ fn icosahedron_match() {
         &render(MeshKind::Icosahedron, [10.0, 20.0, 0.0], MatcherMode::Match),
     );
 }
+
+#[test]
+fn dodecahedron_match() {
+    check(
+        "dodecahedron_match",
+        &render(
+            MeshKind::Dodecahedron,
+            [20.0, 30.0, 0.0],
+            MatcherMode::Match,
+        ),
+    );
+}

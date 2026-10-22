@@ -27,6 +27,7 @@ impl Mesh {
             MeshKind::Cube => Self::cube(),
             MeshKind::Octahedron => Self::octahedron(),
             MeshKind::Icosahedron => Self::icosahedron(),
+            MeshKind::Dodecahedron => Self::dodecahedron(),
             MeshKind::Torus {
                 major,
                 minor,
@@ -110,6 +111,40 @@ impl Mesh {
                         triangles.push([i as u32, j as u32, k as u32]);
                     }
                 }
+            }
+        }
+        convex(vertices, triangles)
+    }
+
+    /// Builds a dodecahedron as the dual of the icosahedron.
+    ///
+    /// # Returns
+    /// The mesh, with each pentagonal face split into three triangles.
+    pub fn dodecahedron() -> Mesh {
+        let ico = Self::icosahedron();
+        let vertices: Vec<Vec3> = ico
+            .triangles
+            .iter()
+            .map(|t| {
+                t.iter()
+                    .map(|&i| ico.vertices[i as usize])
+                    .sum::<Vec3>()
+                    .normalize()
+            })
+            .collect();
+        let mut triangles = Vec::new();
+        for (v, axis) in ico.vertices.iter().enumerate() {
+            let (u, w) = axis.any_orthonormal_pair();
+            let angle = |f: u32| {
+                let p = vertices[f as usize];
+                p.dot(w).atan2(p.dot(u))
+            };
+            let mut ring: Vec<u32> = (0..ico.triangles.len() as u32)
+                .filter(|&f| ico.triangles[f as usize].contains(&(v as u32)))
+                .collect();
+            ring.sort_by(|&a, &b| angle(a).total_cmp(&angle(b)));
+            for k in 1..ring.len() - 1 {
+                triangles.push([ring[0], ring[k], ring[k + 1]]);
             }
         }
         convex(vertices, triangles)
@@ -265,6 +300,7 @@ mod tests {
         assert_eq!(feature_edges(&Mesh::cube(), 1.0).len(), 12);
         assert_eq!(feature_edges(&Mesh::octahedron(), 1.0).len(), 12);
         assert_eq!(feature_edges(&Mesh::icosahedron(), 1.0).len(), 30);
+        assert_eq!(feature_edges(&Mesh::dodecahedron(), 1.0).len(), 30);
         assert_eq!(
             feature_edges(&Mesh::torus(1.5, 0.6, 24, 12), 1.0).len(),
             2 * 24 * 12
@@ -282,6 +318,7 @@ mod tests {
             Mesh::cube(),
             Mesh::octahedron(),
             Mesh::icosahedron(),
+            Mesh::dodecahedron(),
             Mesh::sphere(8, 6),
         ] {
             let c = m.vertices.iter().copied().sum::<Vec3>() / m.vertices.len() as f32;

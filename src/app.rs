@@ -73,7 +73,7 @@ impl App {
             .then(|| LoginPanel::new(glyphs.deny.clone()));
         Self {
             scene: Scene::from_config(&cfg.scene, cfg.render.feature_edge_angle_deg),
-            controls: CameraControls::default(),
+            controls: CameraControls::new(cfg.scene.follow_mouse),
             renderer: Renderer::new(&cfg, &atlas, &glyphs.palette),
             focus: if login.is_some() {
                 Focus::Login
