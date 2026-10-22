@@ -28,6 +28,7 @@ pub fn find_denied(buf: &Buffer, deny: &DenyList) -> Option<(u16, u16, char)> {
     None
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

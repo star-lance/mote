@@ -118,6 +118,7 @@ pub fn project_segment(
     (pa.is_finite() && pb.is_finite()).then_some((pa, pb))
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

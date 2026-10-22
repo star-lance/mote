@@ -134,6 +134,7 @@ impl Atlas {
     }
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

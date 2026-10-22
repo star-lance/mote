@@ -161,6 +161,7 @@ fn downsample(src: &[f32], src_size: [u32; 2], dst_size: [u32; 2]) -> Vec<f32> {
     out
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

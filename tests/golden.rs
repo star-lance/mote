@@ -1,4 +1,5 @@
 //! Golden frame tests; regenerate with `UPDATE_GOLDEN=1 cargo test --test golden`.
+//! These tests were written by Claude Code to ensure code coverage.
 
 use std::path::PathBuf;
 

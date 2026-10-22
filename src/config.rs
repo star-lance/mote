@@ -373,6 +373,7 @@ pub fn load(path: Option<&Path>) -> anyhow::Result<(Config, Vec<String>)> {
     load_str(&text).with_context(|| format!("in {}", path.display()))
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

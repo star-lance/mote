@@ -289,6 +289,7 @@ pub fn feature_edges(mesh: &Mesh, angle_deg: f32) -> Vec<[u32; 2]> {
     edges
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

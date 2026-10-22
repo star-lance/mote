@@ -1,4 +1,5 @@
 //! Tests for the font config that scripts/mote-launch writes.
+//! These tests were written by Claude Code to ensure code coverage.
 
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};

@@ -1,4 +1,5 @@
 //! Tests that run the mote and glyphgen binaries.
+//! These tests were written by Claude Code to ensure code coverage.
 
 use std::process::Command;
 

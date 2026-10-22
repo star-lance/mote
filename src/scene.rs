@@ -107,8 +107,7 @@ impl CameraControls {
         }
     }
 
-    /// Applies mouse input to the camera: drag orbits, scroll zooms, and plain
-    /// movement orbits too when `follow_mouse` is set.
+    /// Applies mouse input to the camera: drag orbits, scroll zooms, movement orbits if `follow_mouse`.
     ///
     /// # Arguments
     /// * `ev` - the input event
@@ -147,6 +146,7 @@ impl CameraControls {
     }
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

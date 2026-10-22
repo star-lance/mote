@@ -217,6 +217,7 @@ pub fn route(ev: &Event, focus: Focus, keys: &KeyConfig, login_rect: Option<Rect
     }
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;

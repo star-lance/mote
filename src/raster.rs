@@ -144,6 +144,7 @@ fn segment_distance(p: DVec2, a: DVec2, b: DVec2, ab: DVec2, len: f64) -> f64 {
     }
 }
 
+// These tests were written by Claude Code to ensure code coverage.
 #[cfg(test)]
 mod tests {
     use super::*;
