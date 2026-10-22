@@ -11,6 +11,7 @@ does not use per-cell rules, and never uses block characters.
 ```sh
 cargo build --release
 scripts/mote-launch          # dedicated kitty window with the bundled font
+scripts/mote-launch --config examples/dodecahedron.toml   # a dodecahedron that follows the mouse
 ```
 
 `scripts/mote-launch` starts kitty with the bundled Ioskeley Mono font (no

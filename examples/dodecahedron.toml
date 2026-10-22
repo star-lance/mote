@@ -1,0 +1,11 @@
+# A single wireframe dodecahedron that turns as the mouse moves.
+
+[scene]
+follow_mouse = true
+
+[[scene.objects]]
+mesh = { type = "dodecahedron" }
+scale = 1.8
+
+[ui.login]
+enabled = false
