@@ -290,9 +290,6 @@ pub struct ValidatedGlyphs {
 
 impl Config {
     /// Checks settings the types can't express and builds the glyph sets.
-    ///
-    /// # Returns
-    /// The palette and denylist, or an error naming the first invalid setting.
     pub fn validate(&self) -> anyhow::Result<ValidatedGlyphs> {
         if self.fps == 0 {
             bail!("fps must be at least 1");
@@ -330,13 +327,7 @@ impl Config {
     }
 }
 
-/// Parses config text.
-///
-/// # Arguments
-/// * `s` - TOML text
-///
-/// # Returns
-/// The config and the paths of any unknown keys.
+/// Parses TOML config text; also returns the paths of any unknown keys.
 pub(crate) fn load_str(s: &str) -> anyhow::Result<(Config, Vec<String>)> {
     let value: toml::Value = toml::from_str(s).context("parsing config")?;
     let mut warnings = Vec::new();
@@ -353,13 +344,8 @@ fn default_path() -> Option<PathBuf> {
     Some(base.join("mote").join("config.toml"))
 }
 
-/// Loads the config file.
-///
-/// # Arguments
-/// * `path` - file to read, or `None` for `$XDG_CONFIG_HOME/mote/config.toml`
-///
-/// # Returns
-/// The config and the paths of any unknown keys; defaults if the default file doesn't exist.
+/// Loads the config file (default `$XDG_CONFIG_HOME/mote/config.toml`); also returns the
+/// paths of any unknown keys. A missing default file yields the defaults.
 pub fn load(path: Option<&Path>) -> anyhow::Result<(Config, Vec<String>)> {
     let path = match path {
         Some(p) => p.to_path_buf(),
@@ -444,7 +430,10 @@ mod tests {
     fn colors_and_keys_parse() {
         let (c, _) = parse("[colors]\nfg = \"#ff0000\"\n[keys]\nquit = \"ctrl+x\"\n");
         assert_eq!(c.colors.fg, Color::Rgb(255, 0, 0));
-        assert_eq!(c.keys.quit, KeyBinding::parse("ctrl+x").unwrap());
+        assert_eq!(
+            c.keys.quit,
+            KeyBinding::try_from("ctrl+x".to_string()).unwrap()
+        );
     }
 
     #[test]

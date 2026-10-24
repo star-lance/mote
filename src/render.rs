@@ -5,11 +5,11 @@ use crate::config::{Config, MatcherMode};
 use crate::geom::Viewport;
 use crate::glyphs::Palette;
 use crate::matcher::{CellGrid, GlyphMatcher, RampMatcher};
-use crate::raster::{CoverageBuffer, WireframeRasterizer};
+use crate::raster::{CoverageBuffer, rasterize};
 use crate::scene::Scene;
 
 pub struct Renderer {
-    rasterizer: WireframeRasterizer,
+    thickness: f32,
     glyph: GlyphMatcher,
     ramp: RampMatcher,
     pub mode: MatcherMode,
@@ -19,21 +19,10 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    /// Builds a renderer.
-    ///
-    /// # Arguments
-    /// * `cfg` - render and matcher settings
-    /// * `atlas` - glyph bitmaps
-    /// * `palette` - characters the output may use
-    ///
-    /// # Returns
-    /// The renderer.
     pub fn new(cfg: &Config, atlas: &Atlas, palette: &Palette) -> Self {
         let atlas = atlas.subset(palette);
         Self {
-            rasterizer: WireframeRasterizer {
-                thickness: cfg.render.line_thickness,
-            },
+            thickness: cfg.render.line_thickness,
             glyph: GlyphMatcher::from_atlas(&atlas),
             ramp: RampMatcher::from_atlas(&atlas),
             mode: cfg.matcher.mode,
@@ -43,25 +32,14 @@ impl Renderer {
         }
     }
 
-    /// Renders the scene to characters.
-    ///
-    /// # Arguments
-    /// * `scene` - the scene
-    /// * `cols` - grid width
-    /// * `rows` - grid height
-    /// * `cell_aspect` - a cell's pixel width divided by its height
-    ///
-    /// # Returns
-    /// The character grid.
+    /// Renders the scene to characters; `cell_aspect` is a cell's pixel width divided by its height.
     pub fn render(&mut self, scene: &Scene, cols: u16, rows: u16, cell_aspect: f32) -> &CellGrid {
         let (cols, rows) = (cols as usize, rows as usize);
         let [sw, sh] = self.sampling;
         if self.grid.cols != cols || self.grid.rows != rows {
             self.grid = CellGrid::new(cols, rows);
-            self.buf.resize(cols * sw, rows * sh);
-        } else {
-            self.buf.clear();
         }
+        self.buf.resize(cols * sw, rows * sh);
         if cols == 0 || rows == 0 {
             return &self.grid;
         }
@@ -70,7 +48,7 @@ impl Renderer {
             height: (rows * sh) as f32,
             sample_aspect: cell_aspect * sh as f32 / sw as f32,
         };
-        self.rasterizer.rasterize(scene, &vp, &mut self.buf);
+        rasterize(scene, &vp, self.thickness, &mut self.buf);
         match self.mode {
             MatcherMode::Match => self.glyph.match_cells(&self.buf, &mut self.grid),
             MatcherMode::Ramp => self.ramp.match_cells(&self.buf, &mut self.grid),

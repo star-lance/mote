@@ -1,5 +1,4 @@
 //! The main loop.
-
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -18,30 +17,7 @@ use crate::ui::find_denied;
 use crate::ui::login::{LoginPanel, authenticate, panel_rect};
 use crate::ui::scene_view::SceneView;
 
-/// Works out the cell shape for projection.
-///
-/// # Arguments
-/// * `measured` - cell size reported by the terminal, if any
-/// * `atlas` - fallback cell size
-///
-/// # Returns
-/// Cell width divided by height.
-pub fn effective_cell_aspect(measured: Option<[u16; 2]>, atlas: &Atlas) -> f32 {
-    match measured {
-        Some([w, h]) if w > 0 && h > 0 => w as f32 / h as f32,
-        _ => atlas.cell_aspect(),
-    }
-}
-
 /// Runs mote until the user quits.
-///
-/// # Arguments
-/// * `cfg` - the config
-/// * `glyphs` - the validated palette and denylist
-/// * `atlas` - glyph bitmaps
-///
-/// # Returns
-/// An error if the terminal fails.
 pub fn run(cfg: Config, glyphs: ValidatedGlyphs, atlas: Atlas) -> anyhow::Result<()> {
     let mut terminal = term::setup().context("setting up terminal")?;
     let result = App::new(cfg, glyphs, atlas).run(&mut terminal);
@@ -92,12 +68,6 @@ impl App {
     }
 
     /// Runs the frame loop.
-    ///
-    /// # Arguments
-    /// * `terminal` - the terminal to draw to
-    ///
-    /// # Returns
-    /// An error if the terminal fails.
     fn run(&mut self, terminal: &mut Term) -> anyhow::Result<()> {
         let period = Duration::from_secs_f64(1.0 / self.cfg.fps as f64);
         let mut next_frame = Instant::now();
@@ -136,16 +106,9 @@ impl App {
             .and_then(|_| panel_rect(screen, self.cfg.ui.login.position))
     }
 
-    /// Dispatches an input event.
-    ///
-    /// # Arguments
-    /// * `ev` - the event
-    /// * `screen` - the current screen area
-    ///
-    /// # Returns
-    /// `false` when the app should quit.
+    /// Dispatches an input event; returns `false` when the app should quit.
     fn handle_event(&mut self, ev: &Event, screen: Rect) -> bool {
-        if let Event::Resize { .. } = ev {
+        if *ev == Event::Resize {
             self.cell_px = term::cell_pixel_size();
         }
         match route(ev, self.focus, &self.cfg.keys, self.login_rect(screen)) {
@@ -177,12 +140,6 @@ impl App {
     }
 
     /// Renders and draws one frame.
-    ///
-    /// # Arguments
-    /// * `terminal` - the terminal to draw to
-    ///
-    /// # Returns
-    /// An error if the terminal fails.
     fn draw(&mut self, terminal: &mut Term) -> anyhow::Result<()> {
         let size = terminal.size()?;
         let screen = Rect::new(0, 0, size.width, size.height);
@@ -201,7 +158,9 @@ impl App {
         });
 
         let start = Instant::now();
-        let cell_aspect = effective_cell_aspect(self.cell_px, &self.atlas);
+        let cell_aspect = self
+            .cell_px
+            .map_or(self.atlas.cell_aspect(), |[w, h]| w as f32 / h as f32);
         let grid = self
             .renderer
             .render(&self.scene, size.width, size.height, cell_aspect);
@@ -244,13 +203,6 @@ impl App {
 mod tests {
     use super::*;
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-
-    #[test]
-    fn zero_pixel_size_falls_back_to_atlas() {
-        let a = Atlas::embedded_default();
-        assert_eq!(effective_cell_aspect(None, &a), a.cell_aspect());
-        assert_eq!(effective_cell_aspect(Some([10, 20]), &a), 0.5);
-    }
 
     const SCREEN: Rect = Rect {
         x: 0,

@@ -15,9 +15,7 @@ use ratatui::crossterm::{cursor, execute};
 pub type Term = Terminal<CrosstermBackend<Stdout>>;
 
 /// Prepares the terminal: raw mode, alternate screen, mouse capture, bracketed paste.
-///
-/// # Returns
-/// The ratatui terminal; a panic hook restores the terminal if the program panics.
+/// Installs a panic hook that restores the terminal.
 pub fn setup() -> io::Result<Term> {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -36,9 +34,6 @@ pub fn setup() -> io::Result<Term> {
 }
 
 /// Undoes `setup`.
-///
-/// # Returns
-/// An error if the terminal couldn't be written to.
 pub fn restore() -> io::Result<()> {
     let raw = disable_raw_mode();
     execute!(
@@ -51,14 +46,12 @@ pub fn restore() -> io::Result<()> {
     raw
 }
 
-/// Measures the terminal's cell size.
-///
-/// # Returns
-/// Width and height in pixels, or `None` if the terminal doesn't report them.
+/// Measures the terminal's cell size in pixels, or `None` if the terminal doesn't report it.
 pub fn cell_pixel_size() -> Option<[u16; 2]> {
     let ws = ratatui::crossterm::terminal::window_size().ok()?;
-    if ws.width == 0 || ws.height == 0 || ws.columns == 0 || ws.rows == 0 {
-        return None;
-    }
-    Some([ws.width / ws.columns, ws.height / ws.rows])
+    let cell = [
+        ws.width.checked_div(ws.columns)?,
+        ws.height.checked_div(ws.rows)?,
+    ];
+    (!cell.contains(&0)).then_some(cell)
 }

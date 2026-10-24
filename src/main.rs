@@ -17,12 +17,6 @@ struct Args {
 }
 
 /// Loads the config and atlas, then starts the app.
-///
-/// # Arguments
-/// * `args` - command-line arguments
-///
-/// # Returns
-/// An error for invalid config, a mismatched atlas, or a terminal failure.
 fn run(args: Args) -> anyhow::Result<()> {
     let (cfg, warnings) = config::load(args.config.as_deref())?;
     for key in warnings {
@@ -34,13 +28,12 @@ fn run(args: Args) -> anyhow::Result<()> {
         Some(path) => Atlas::load(path)?,
         None => Atlas::embedded_default(),
     };
-    let atlas_chars = atlas.chars();
     let missing: Vec<char> = glyphs
         .palette
         .chars()
         .iter()
         .copied()
-        .filter(|c| !atlas_chars.contains(c))
+        .filter(|&c| !atlas.glyphs.iter().any(|g| g.ch == c))
         .collect();
     if !missing.is_empty() {
         bail!(

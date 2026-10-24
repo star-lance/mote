@@ -13,22 +13,9 @@ use crate::glyphs::DenyList;
 use crate::input::Event;
 use crate::ui::text_input::TextInput;
 
-#[derive(thiserror::Error, Debug)]
-pub enum AuthError {
-    #[error("authentication not implemented")]
-    NotImplemented,
-}
-
-/// Checks a username and password.
-///
-/// # Arguments
-/// * `_username` - the user name
-/// * `_password` - the password
-///
-/// # Returns
-/// `Ok` on success; currently always `AuthError::NotImplemented`.
-pub fn authenticate(_username: &str, _password: &str) -> Result<(), AuthError> {
-    Err(AuthError::NotImplemented)
+/// Checks a username and password; not implemented yet, so it always fails.
+pub fn authenticate(_username: &str, _password: &str) -> anyhow::Result<()> {
+    anyhow::bail!("authentication not implemented")
 }
 
 pub struct LoginSubmit {
@@ -65,14 +52,7 @@ const ASCII_BORDER: border::Set<'static> = border::Set {
 const PANEL_SIZE: (u16, u16) = (40, 8);
 const MIN_SIZE: (u16, u16) = (20, 5);
 
-/// Places the login panel.
-///
-/// # Arguments
-/// * `screen` - the full screen area
-/// * `pos` - where the panel goes
-///
-/// # Returns
-/// The panel's area, or `None` if the screen is smaller than 20x5.
+/// Places the login panel, or `None` if the screen is smaller than 20x5.
 pub fn panel_rect(screen: Rect, pos: LoginPosition) -> Option<Rect> {
     if screen.width < MIN_SIZE.0 || screen.height < MIN_SIZE.1 {
         return None;
@@ -91,27 +71,12 @@ pub fn panel_rect(screen: Rect, pos: LoginPosition) -> Option<Rect> {
 }
 
 impl LoginPanel {
-    /// Builds an empty login panel.
-    ///
-    /// # Arguments
-    /// * `deny` - characters never accepted as input or drawn
-    ///
-    /// # Returns
-    /// The panel.
+    /// Builds an empty login panel; `deny` characters are never accepted as input or drawn.
     pub fn new(deny: DenyList) -> Self {
-        let p = border::PLAIN;
-        let box_chars = [
-            p.top_left,
-            p.top_right,
-            p.bottom_left,
-            p.bottom_right,
-            p.vertical_left,
-            p.horizontal_top,
-        ];
-        let border = if box_chars.concat().chars().any(|c| deny.is_denied(c)) {
+        let border = if "┌┐└┘│─".chars().any(|c| deny.is_denied(c)) {
             ASCII_BORDER
         } else {
-            p
+            border::PLAIN
         };
         Self {
             deny,
@@ -134,13 +99,7 @@ impl LoginPanel {
         self.status = s.into();
     }
 
-    /// Applies an input event to the form.
-    ///
-    /// # Arguments
-    /// * `ev` - the event
-    ///
-    /// # Returns
-    /// The credentials when the form is submitted; the password field is cleared then.
+    /// Applies an input event; on submit, returns the credentials and clears the password.
     pub fn handle_event(&mut self, ev: &Event) -> Option<LoginSubmit> {
         match ev {
             Event::Paste(s) => {
@@ -169,12 +128,6 @@ impl LoginPanel {
     }
 
     /// Draws the panel.
-    ///
-    /// # Arguments
-    /// * `area` - where to draw
-    /// * `buf` - the frame buffer
-    /// * `focused` - whether the panel has keyboard focus
-    /// * `colors` - UI colors
     pub fn render(&self, area: Rect, buf: &mut Buffer, focused: bool, colors: &ColorConfig) {
         let accent = colors.ui_accent;
         let base = Style::default().fg(colors.ui_fg).bg(colors.bg);
@@ -215,38 +168,27 @@ impl LoginPanel {
     }
 }
 
-/// Lays out the visible part of a field.
-///
-/// # Arguments
-/// * `input` - the field
-/// * `width` - columns available
-/// * `show_cursor` - whether to highlight the cursor cell
-/// * `style` - base text style
-///
-/// # Returns
-/// The spans to draw.
+/// Lays out the part of a field that fits in `width` columns.
 fn field_spans(
     input: &TextInput,
     width: usize,
     show_cursor: bool,
     style: Style,
 ) -> Vec<Span<'static>> {
-    let chars: Vec<char> = input.display().chars().collect();
     let cursor = input.cursor();
     let width = width.max(1);
     let start = (cursor + 1).saturating_sub(width);
-    let visible: Vec<char> = chars.iter().skip(start).take(width).copied().collect();
+    let visible: String = input.display().chars().skip(start).take(width).collect();
     if !show_cursor {
-        return vec![Span::styled(visible.into_iter().collect::<String>(), style)];
+        return vec![Span::styled(visible, style)];
     }
-    let at = cursor - start;
-    let before: String = visible.iter().take(at).collect();
-    let under = visible.get(at).copied().unwrap_or(' ');
-    let after: String = visible.iter().skip(at + 1).collect();
+    let mut rest = visible.chars();
+    let before: String = rest.by_ref().take(cursor - start).collect();
+    let under = rest.next().unwrap_or(' ');
     vec![
         Span::styled(before, style),
         Span::styled(under.to_string(), style.add_modifier(Modifier::REVERSED)),
-        Span::styled(after, style),
+        Span::styled(rest.collect::<String>(), style),
     ]
 }
 
@@ -278,10 +220,7 @@ mod tests {
             (s.username.as_str(), s.password.as_str()),
             ("star", "hunter2")
         );
-        assert!(matches!(
-            authenticate(&s.username, &s.password),
-            Err(AuthError::NotImplemented)
-        ));
+        assert!(authenticate(&s.username, &s.password).is_err());
     }
 
     #[test]

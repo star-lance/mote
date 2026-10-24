@@ -8,14 +8,7 @@ pub mod login;
 pub mod scene_view;
 pub mod text_input;
 
-/// Searches a frame for denied characters.
-///
-/// # Arguments
-/// * `buf` - the rendered frame
-/// * `deny` - characters that may not be output
-///
-/// # Returns
-/// The position and character of the first match, or `None`.
+/// Finds the position and character of the first denied character in a frame.
 pub fn find_denied(buf: &Buffer, deny: &DenyList) -> Option<(u16, u16, char)> {
     let area = buf.area;
     for y in area.top()..area.bottom() {

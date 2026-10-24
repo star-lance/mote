@@ -6,15 +6,14 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub struct TextInput {
     value: String,
     cursor: usize,
-    pub masked: bool,
+    masked: bool,
 }
 
 impl TextInput {
     pub fn new(masked: bool) -> Self {
         Self {
-            value: String::new(),
-            cursor: 0,
             masked,
+            ..Default::default()
         }
     }
 
@@ -43,9 +42,6 @@ impl TextInput {
     }
 
     /// Inserts text at the cursor, dropping control characters.
-    ///
-    /// # Arguments
-    /// * `s` - the text
     pub fn insert_str(&mut self, s: &str) {
         for c in s.chars().filter(|c| !c.is_control()) {
             let at = self.byte_index(self.cursor);
@@ -54,13 +50,7 @@ impl TextInput {
         }
     }
 
-    /// Applies an editing key.
-    ///
-    /// # Arguments
-    /// * `k` - the key event
-    ///
-    /// # Returns
-    /// `true` if Enter was pressed.
+    /// Applies an editing key; returns `true` if Enter was pressed.
     pub fn handle_key(&mut self, k: &KeyEvent) -> bool {
         if k.modifiers
             .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
@@ -88,10 +78,7 @@ impl TextInput {
         false
     }
 
-    /// Formats the field for display.
-    ///
-    /// # Returns
-    /// The text, or one `*` per character when masked.
+    /// Formats the field for display, with one `*` per character when masked.
     pub fn display(&self) -> String {
         if self.masked {
             "*".repeat(self.len())

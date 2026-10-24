@@ -18,14 +18,7 @@ pub struct SceneObject {
 }
 
 impl SceneObject {
-    /// Builds a scene object.
-    ///
-    /// # Arguments
-    /// * `c` - the object's config
-    /// * `edge_angle_deg` - angle threshold for wireframe edges
-    ///
-    /// # Returns
-    /// The object with its edges precomputed.
+    /// Builds a scene object with its wireframe edges precomputed.
     pub fn from_config(c: &ObjectConfig, edge_angle_deg: f32) -> SceneObject {
         let mesh = Mesh::from_kind(&c.mesh);
         let edges = feature_edges(&mesh, edge_angle_deg);
@@ -52,14 +45,6 @@ pub struct Scene {
 }
 
 impl Scene {
-    /// Builds the scene.
-    ///
-    /// # Arguments
-    /// * `c` - camera and object config
-    /// * `edge_angle_deg` - angle threshold for wireframe edges
-    ///
-    /// # Returns
-    /// The scene.
     pub fn from_config(c: &SceneConfig, edge_angle_deg: f32) -> Scene {
         Scene {
             camera: Camera::from_config(&c.camera),
@@ -71,10 +56,7 @@ impl Scene {
         }
     }
 
-    /// Advances each object's spin.
-    ///
-    /// # Arguments
-    /// * `dt` - elapsed time in seconds
+    /// Advances each object's spin by `dt` seconds.
     pub fn update(&mut self, dt: f32) {
         for o in &mut self.objects {
             let step = o.spin * dt;
@@ -93,13 +75,7 @@ pub struct CameraControls {
 const ORBIT_RAD_PER_CELL: f32 = 0.05;
 
 impl CameraControls {
-    /// Builds camera controls.
-    ///
-    /// # Arguments
-    /// * `follow_mouse` - whether plain mouse movement orbits the camera
-    ///
-    /// # Returns
-    /// The controls.
+    /// Builds camera controls; with `follow_mouse`, plain mouse movement orbits the camera.
     pub fn new(follow_mouse: bool) -> Self {
         Self {
             follow_mouse,
@@ -108,10 +84,6 @@ impl CameraControls {
     }
 
     /// Applies mouse input to the camera: drag orbits, scroll zooms, movement orbits if `follow_mouse`.
-    ///
-    /// # Arguments
-    /// * `ev` - the input event
-    /// * `camera` - the camera to move
     pub fn handle_event(&mut self, ev: &Event, camera: &mut Camera) {
         match *ev {
             Event::MouseDown {
@@ -125,17 +97,12 @@ impl CameraControls {
                 button: MouseButton::Left,
             } => self.orbit_to(col, row, camera),
             Event::MouseMove { col, row } if self.follow_mouse => self.orbit_to(col, row, camera),
-            Event::Scroll { delta, .. } => camera.dolly(if delta < 0 { 0.9 } else { 1.1 }),
+            Event::Scroll(delta) => camera.dolly(if delta < 0 { 0.9 } else { 1.1 }),
             _ => {}
         }
     }
 
     /// Orbits the camera by the pointer's movement since the last event.
-    ///
-    /// # Arguments
-    /// * `col` - pointer column
-    /// * `row` - pointer row
-    /// * `camera` - the camera to move
     fn orbit_to(&mut self, col: u16, row: u16, camera: &mut Camera) {
         if let Some((c0, r0)) = self.last {
             let dx = col as f32 - c0 as f32;

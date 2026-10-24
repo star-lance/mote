@@ -14,13 +14,6 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    /// Builds the mesh for a config entry.
-    ///
-    /// # Arguments
-    /// * `kind` - the mesh type and its parameters
-    ///
-    /// # Returns
-    /// The mesh.
     pub fn from_kind(kind: &MeshKind) -> Mesh {
         match *kind {
             MeshKind::Tetrahedron => Self::tetrahedron(),
@@ -116,10 +109,7 @@ impl Mesh {
         convex(vertices, triangles)
     }
 
-    /// Builds a dodecahedron as the dual of the icosahedron.
-    ///
-    /// # Returns
-    /// The mesh, with each pentagonal face split into three triangles.
+    /// Builds a dodecahedron as the icosahedron's dual, each pentagon split into three triangles.
     pub fn dodecahedron() -> Mesh {
         let ico = Self::icosahedron();
         let vertices: Vec<Vec3> = ico
@@ -151,15 +141,6 @@ impl Mesh {
     }
 
     /// Builds a torus around the Y axis.
-    ///
-    /// # Arguments
-    /// * `major` - radius of the ring
-    /// * `minor` - radius of the tube
-    /// * `segments` - divisions around the ring
-    /// * `sides` - divisions around the tube
-    ///
-    /// # Returns
-    /// The mesh.
     pub fn torus(major: f32, minor: f32, segments: u32, sides: u32) -> Mesh {
         let (n, m) = (segments, sides);
         let mut vertices = Vec::with_capacity((n * m) as usize);
@@ -191,13 +172,6 @@ impl Mesh {
     }
 
     /// Builds a unit UV sphere.
-    ///
-    /// # Arguments
-    /// * `segments` - vertices around each latitude ring
-    /// * `rings` - number of latitude bands
-    ///
-    /// # Returns
-    /// The mesh.
     pub fn sphere(segments: u32, rings: u32) -> Mesh {
         let (n, r) = (segments, rings);
         let mut vertices = vec![Vec3::Y, -Vec3::Y];
@@ -243,14 +217,7 @@ fn convex(vertices: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> Mesh {
     )
 }
 
-/// Flips triangles so they face outward.
-///
-/// # Arguments
-/// * `mesh` - the mesh to fix
-/// * `inside` - maps a triangle's centroid to a point inside the surface
-///
-/// # Returns
-/// The re-wound mesh.
+/// Flips triangles to face outward; `inside` maps a centroid to a point inside the surface.
 fn orient(mut mesh: Mesh, inside: impl Fn(Vec3) -> Vec3) -> Mesh {
     for t in &mut mesh.triangles {
         let [a, b, c] = t.map(|i| mesh.vertices[i as usize]);
@@ -262,14 +229,8 @@ fn orient(mut mesh: Mesh, inside: impl Fn(Vec3) -> Vec3) -> Mesh {
     mesh
 }
 
-/// Finds the edges worth drawing in a wireframe.
-///
-/// # Arguments
-/// * `mesh` - the mesh
-/// * `angle_deg` - minimum angle between adjacent faces for their shared edge to count
-///
-/// # Returns
-/// Sorted `[min, max]` vertex index pairs; edges between coplanar faces are left out.
+/// Finds the edges worth drawing in a wireframe: those whose faces meet at `angle_deg` or more.
+/// Returns sorted `[min, max]` vertex index pairs.
 pub fn feature_edges(mesh: &Mesh, angle_deg: f32) -> Vec<[u32; 2]> {
     let mut normals: HashMap<[u32; 2], Vec<Vec3>> = HashMap::new();
     for t in &mesh.triangles {

@@ -27,10 +27,7 @@ impl CellGrid {
         self.cells[row * self.cols + col]
     }
 
-    /// Renders the grid as text.
-    ///
-    /// # Returns
-    /// The rows joined by newlines, without a trailing newline.
+    /// Joins the rows with newlines, without a trailing newline.
     pub fn to_text(&self) -> String {
         self.cells
             .chunks(self.cols.max(1))
@@ -41,23 +38,12 @@ impl CellGrid {
 }
 
 /// Picks a character for every cell, in parallel over rows.
-///
-/// # Arguments
-/// * `buf` - coverage at `cols * S_w` by `rows * S_h` samples
-/// * `grid` - receives the characters
-/// * `sampling` - samples per cell
-/// * `pick` - maps a cell's samples to a character
-fn for_each_cell(
-    buf: &CoverageBuffer,
-    grid: &mut CellGrid,
-    sampling: [usize; 2],
-    pick: impl Fn(&[f32]) -> char + Sync,
-) {
-    let [sw, sh] = sampling;
+fn for_each_cell(buf: &CoverageBuffer, grid: &mut CellGrid, pick: impl Fn(&[f32]) -> char + Sync) {
     let cols = grid.cols;
-    if cols == 0 {
+    if cols == 0 || grid.rows == 0 {
         return;
     }
+    let (sw, sh) = (buf.width / cols, buf.height / grid.rows);
     grid.cells
         .par_chunks_mut(cols)
         .enumerate()
@@ -78,18 +64,10 @@ fn for_each_cell(
 }
 
 pub struct GlyphMatcher {
-    sampling: [usize; 2],
     glyphs: Vec<(char, Vec<f32>)>,
 }
 
 impl GlyphMatcher {
-    /// Builds a glyph matcher.
-    ///
-    /// # Arguments
-    /// * `atlas` - the glyphs to choose from
-    ///
-    /// # Returns
-    /// The matcher.
     pub fn from_atlas(atlas: &Atlas) -> Self {
         let mut glyphs: Vec<(char, Vec<f32>)> = atlas
             .glyphs
@@ -97,78 +75,49 @@ impl GlyphMatcher {
             .map(|g| (g.ch, g.coverage.iter().map(|&v| v as f32 / 255.0).collect()))
             .collect();
         glyphs.sort_by_key(|(c, _)| *c);
-        Self {
-            sampling: atlas.sampling.map(|v| v as usize),
-            glyphs,
-        }
+        Self { glyphs }
     }
-}
 
-impl GlyphMatcher {
     /// Picks the glyph closest to each cell by sum of squared differences.
-    ///
-    /// # Arguments
-    /// * `buf` - the coverage buffer
-    /// * `grid` - receives the characters
     pub fn match_cells(&self, buf: &CoverageBuffer, grid: &mut CellGrid) {
-        for_each_cell(buf, grid, self.sampling, |patch| {
-            let mut best = (f32::INFINITY, ' ');
-            for (ch, bitmap) in &self.glyphs {
-                let err: f32 = patch
+        for_each_cell(buf, grid, |patch| {
+            let err = |bitmap: &[f32]| -> f32 {
+                patch
                     .iter()
                     .zip(bitmap)
                     .map(|(a, b)| (a - b) * (a - b))
-                    .sum();
-                if err < best.0 {
-                    best = (err, *ch);
-                }
-            }
-            best.1
+                    .sum()
+            };
+            self.glyphs
+                .iter()
+                .map(|(ch, bitmap)| (err(bitmap), *ch))
+                .min_by(|a, b| a.0.total_cmp(&b.0))
+                .map_or(' ', |best| best.1)
         });
     }
 }
 
 pub struct RampMatcher {
-    sampling: [usize; 2],
     ramp: Vec<(f32, char)>,
 }
 
 impl RampMatcher {
-    /// Builds a ramp matcher.
-    ///
-    /// # Arguments
-    /// * `atlas` - the glyphs to choose from
-    ///
-    /// # Returns
-    /// The matcher.
     pub fn from_atlas(atlas: &Atlas) -> Self {
         let mut ramp: Vec<(f32, char)> = atlas.glyphs.iter().map(|g| (g.ink, g.ch)).collect();
         ramp.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-        Self {
-            sampling: atlas.sampling.map(|v| v as usize),
-            ramp,
-        }
+        Self { ramp }
     }
-}
 
-impl RampMatcher {
     /// Picks the glyph whose ink best matches each cell's mean coverage.
-    ///
-    /// # Arguments
-    /// * `buf` - the coverage buffer
-    /// * `grid` - receives the characters
     pub fn match_cells(&self, buf: &CoverageBuffer, grid: &mut CellGrid) {
         let max_ink = self.ramp.last().map_or(0.0, |r| r.0);
-        for_each_cell(buf, grid, self.sampling, |patch| {
+        for_each_cell(buf, grid, |patch| {
             let target = patch.iter().sum::<f32>() / patch.len() as f32 * max_ink;
-            let mut best = (f32::INFINITY, ' ');
-            for &(ink, ch) in &self.ramp {
-                let d = (ink - target).abs();
-                if d < best.0 {
-                    best = (d, ch);
-                }
-            }
-            best.1
+            self.ramp
+                .iter()
+                .map(|&(ink, ch)| ((ink - target).abs(), ch))
+                .min_by(|a, b| a.0.total_cmp(&b.0))
+                .map_or(' ', |best| best.1)
         });
     }
 }

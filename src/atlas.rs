@@ -10,13 +10,7 @@ use crate::glyphs::Palette;
 
 pub const ATLAS_VERSION: u32 = 1;
 
-/// Hashes bytes with SHA-256.
-///
-/// # Arguments
-/// * `bytes` - the data to hash
-///
-/// # Returns
-/// The digest as lowercase hex.
+/// Hashes bytes with SHA-256, as lowercase hex.
 pub fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -44,13 +38,7 @@ pub struct AtlasGlyph {
 }
 
 impl Atlas {
-    /// Parses and checks an atlas.
-    ///
-    /// # Arguments
-    /// * `s` - atlas JSON
-    ///
-    /// # Returns
-    /// The atlas, or an error for an unsupported version or wrongly sized bitmaps.
+    /// Parses an atlas, rejecting unsupported versions and wrongly sized bitmaps.
     pub fn from_json(s: &str) -> anyhow::Result<Atlas> {
         let atlas: Atlas = serde_json::from_str(s).context("parsing atlas")?;
         if atlas.version != ATLAS_VERSION {
@@ -73,10 +61,7 @@ impl Atlas {
         Ok(atlas)
     }
 
-    /// Serializes the atlas.
-    ///
-    /// # Returns
-    /// Pretty-printed JSON ending in a newline.
+    /// Serializes the atlas as pretty-printed JSON ending in a newline.
     pub fn to_json(&self) -> String {
         let mut s = serde_json::to_string_pretty(self).expect("atlas serializes");
         s.push('\n');
@@ -84,38 +69,19 @@ impl Atlas {
     }
 
     /// Reads an atlas file.
-    ///
-    /// # Arguments
-    /// * `path` - the JSON file
-    ///
-    /// # Returns
-    /// The atlas, or an error if it can't be read or parsed.
     pub fn load(path: &Path) -> anyhow::Result<Atlas> {
         let text =
             std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
         Self::from_json(&text).with_context(|| format!("in {}", path.display()))
     }
 
-    /// Loads the atlas built into the binary.
-    ///
-    /// # Returns
-    /// The Ioskeley Mono Regular atlas for printable ASCII.
+    /// Loads the bundled Ioskeley Mono Regular atlas for printable ASCII.
     pub fn embedded_default() -> Atlas {
         Self::from_json(include_str!("../assets/atlas/default.json"))
             .expect("bundled atlas is valid")
     }
 
-    pub fn chars(&self) -> Vec<char> {
-        self.glyphs.iter().map(|g| g.ch).collect()
-    }
-
-    /// Restricts the atlas to a palette.
-    ///
-    /// # Arguments
-    /// * `palette` - the characters to keep
-    ///
-    /// # Returns
-    /// A copy containing only glyphs in `palette`.
+    /// Returns a copy containing only the glyphs in `palette`.
     pub fn subset(&self, palette: &Palette) -> Atlas {
         let glyphs = self
             .glyphs

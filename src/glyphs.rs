@@ -17,25 +17,12 @@ pub struct DenyList {
 }
 
 impl DenyList {
-    /// Builds a denylist from the built-in ranges plus extra ones.
-    ///
-    /// # Arguments
-    /// * `extra` - additional code point ranges to deny
-    ///
-    /// # Returns
-    /// The combined denylist.
+    /// Builds a denylist from the built-in ranges plus `extra`.
     pub fn new(extra: &[RangeInclusive<u32>]) -> Self {
         let ranges = BUILTIN_DENY.iter().chain(extra).cloned().collect();
         Self { ranges }
     }
 
-    /// Checks whether a character may not be output.
-    ///
-    /// # Arguments
-    /// * `c` - the character to check
-    ///
-    /// # Returns
-    /// `true` if `c` falls in a denied range.
     pub fn is_denied(&self, c: char) -> bool {
         let c = c as u32;
         self.ranges.iter().any(|r| r.contains(&c))
@@ -47,20 +34,11 @@ fn parse_code_point(s: &str) -> Option<u32> {
     u32::from_str_radix(hex, 16).ok()
 }
 
-/// Parses a code point range.
-///
-/// # Arguments
-/// * `s` - `U+XXXX` or `U+XXXX-U+YYYY`
-///
-/// # Returns
-/// The inclusive range, or an error if it is malformed or reversed.
+/// Parses `U+XXXX` or `U+XXXX-U+YYYY` into an inclusive range.
 pub fn parse_range(s: &str) -> anyhow::Result<RangeInclusive<u32>> {
     let s = s.trim();
-    let (lo, hi) = match s.split_once('-') {
-        Some((a, b)) => (parse_code_point(a.trim()), parse_code_point(b.trim())),
-        None => (parse_code_point(s), parse_code_point(s)),
-    };
-    match (lo, hi) {
+    let (a, b) = s.split_once('-').unwrap_or((s, s));
+    match (parse_code_point(a.trim()), parse_code_point(b.trim())) {
         (Some(lo), Some(hi)) if lo <= hi => Ok(lo..=hi),
         _ => Err(anyhow!(
             "invalid code point range '{s}' (expected U+XXXX or U+XXXX-U+YYYY)"
@@ -80,13 +58,7 @@ impl Palette {
         }
     }
 
-    /// Builds a palette from its config value.
-    ///
-    /// # Arguments
-    /// * `spec` - `"ascii95"` or a literal string of characters
-    ///
-    /// # Returns
-    /// The sorted, de-duplicated palette, or an error if it is empty.
+    /// Builds a sorted, de-duplicated palette from `"ascii95"` or a literal string of characters.
     pub fn parse(spec: &str) -> anyhow::Result<Self> {
         if spec == "ascii95" {
             return Ok(Self::ascii95());
@@ -104,13 +76,7 @@ impl Palette {
         &self.chars
     }
 
-    /// Checks the palette against a denylist.
-    ///
-    /// # Arguments
-    /// * `deny` - characters that may not be output
-    ///
-    /// # Returns
-    /// An error listing any denied characters in the palette.
+    /// Fails with a list of any palette characters that are denied.
     pub fn validate(&self, deny: &DenyList) -> anyhow::Result<()> {
         let denied: Vec<char> = self
             .chars

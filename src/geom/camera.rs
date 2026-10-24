@@ -8,40 +8,26 @@ use crate::config::CameraConfig;
 pub struct Camera {
     pub position: Vec3,
     pub target: Vec3,
-    pub up: Vec3,
     pub fov_y_deg: f32,
-    pub near: f32,
 }
 
+const NEAR: f32 = 0.05;
 const MAX_PITCH: f32 = 89.0 * std::f32::consts::PI / 180.0;
 
 impl Camera {
-    /// Builds a camera from config.
-    ///
-    /// # Arguments
-    /// * `c` - position, target and field of view
-    ///
-    /// # Returns
-    /// The camera.
     pub fn from_config(c: &CameraConfig) -> Camera {
         Camera {
             position: Vec3::from(c.position),
             target: Vec3::from(c.target),
-            up: Vec3::Y,
             fov_y_deg: c.fov_deg,
-            near: 0.05,
         }
     }
 
     pub fn view(&self) -> Mat4 {
-        glam::camera::rh::view::look_at_mat4(self.position, self.target, self.up)
+        glam::camera::rh::view::look_at_mat4(self.position, self.target, Vec3::Y)
     }
 
-    /// Rotates the camera around its target.
-    ///
-    /// # Arguments
-    /// * `yaw_rad` - rotation around the up axis
-    /// * `pitch_rad` - rotation up or down, clamped to ±89°
+    /// Rotates the camera around its target; pitch is clamped to ±89°.
     pub fn orbit(&mut self, yaw_rad: f32, pitch_rad: f32) {
         let offset = self.position - self.target;
         let r = offset.length();
@@ -59,13 +45,10 @@ impl Camera {
             );
     }
 
-    /// Moves the camera toward or away from its target.
-    ///
-    /// # Arguments
-    /// * `factor` - multiplier for the distance to the target
+    /// Multiplies the camera's distance to its target by `factor`.
     pub fn dolly(&mut self, factor: f32) {
         let offset = self.position - self.target;
-        let dist = (offset.length() * factor).max(self.near * 2.0);
+        let dist = (offset.length() * factor).max(NEAR * 2.0);
         self.position = self.target + offset.normalize_or(Vec3::Z) * dist;
     }
 }
@@ -77,17 +60,8 @@ pub struct Viewport {
     pub sample_aspect: f32,
 }
 
-/// Projects a world-space segment into sample coordinates.
-///
-/// # Arguments
-/// * `view` - the camera's view matrix
-/// * `cam` - the camera
-/// * `vp` - the render target
-/// * `a` - first endpoint
-/// * `b` - second endpoint
-///
-/// # Returns
-/// The endpoints (x right, y down) clipped to the near plane, or `None` if the segment is behind the camera.
+/// Projects a world-space segment into sample coordinates (x right, y down), clipped to the
+/// near plane, or `None` if it is behind the camera.
 pub fn project_segment(
     view: &Mat4,
     cam: &Camera,
@@ -97,7 +71,7 @@ pub fn project_segment(
 ) -> Option<(Vec2, Vec2)> {
     let mut a = (*view * a.extend(1.0)).xyz();
     let mut b = (*view * b.extend(1.0)).xyz();
-    let z_clip = -cam.near;
+    let z_clip = -NEAR;
     match (a.z <= z_clip, b.z <= z_clip) {
         (false, false) => return None,
         (true, false) => b = a + (b - a) * ((z_clip - a.z) / (b.z - a.z)),

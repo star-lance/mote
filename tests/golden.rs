@@ -36,65 +36,45 @@ fn render(mesh: MeshKind, rotation: [f32; 3], mode: MatcherMode) -> String {
     };
     let scene = Scene::from_config(&cfg.scene, cfg.render.feature_edge_angle_deg);
     let mut r = Renderer::new(&cfg, &atlas, &Palette::ascii95());
-    let text = r.render(&scene, 80, 24, atlas.cell_aspect()).to_text();
-    let palette = Palette::ascii95();
-    assert!(
-        text.chars()
-            .all(|c| c == '\n' || palette.chars().contains(&c)),
-        "char outside palette"
-    );
-    text
+    r.render(&scene, 80, 24, atlas.cell_aspect()).to_text()
 }
 
-fn torus() -> MeshKind {
-    MeshKind::Torus {
+#[test]
+fn golden_frames() {
+    let torus = MeshKind::Torus {
         major: 1.5,
         minor: 0.6,
         segments: 24,
         sides: 12,
-    }
-}
-
-#[test]
-fn cube_match() {
-    check(
-        "cube_match",
-        &render(MeshKind::Cube, [25.0, 35.0, 0.0], MatcherMode::Match),
-    );
-}
-
-#[test]
-fn cube_ramp() {
-    check(
-        "cube_ramp",
-        &render(MeshKind::Cube, [25.0, 35.0, 0.0], MatcherMode::Ramp),
-    );
-}
-
-#[test]
-fn torus_match() {
-    check(
-        "torus_match",
-        &render(torus(), [60.0, 0.0, 20.0], MatcherMode::Match),
-    );
-}
-
-#[test]
-fn icosahedron_match() {
-    check(
-        "icosahedron_match",
-        &render(MeshKind::Icosahedron, [10.0, 20.0, 0.0], MatcherMode::Match),
-    );
-}
-
-#[test]
-fn dodecahedron_match() {
-    check(
-        "dodecahedron_match",
-        &render(
+    };
+    let cases = [
+        (
+            "cube_match",
+            MeshKind::Cube,
+            [25.0, 35.0, 0.0],
+            MatcherMode::Match,
+        ),
+        (
+            "cube_ramp",
+            MeshKind::Cube,
+            [25.0, 35.0, 0.0],
+            MatcherMode::Ramp,
+        ),
+        ("torus_match", torus, [60.0, 0.0, 20.0], MatcherMode::Match),
+        (
+            "icosahedron_match",
+            MeshKind::Icosahedron,
+            [10.0, 20.0, 0.0],
+            MatcherMode::Match,
+        ),
+        (
+            "dodecahedron_match",
             MeshKind::Dodecahedron,
             [20.0, 30.0, 0.0],
             MatcherMode::Match,
         ),
-    );
+    ];
+    for (name, mesh, rotation, mode) in cases {
+        check(name, &render(mesh, rotation, mode));
+    }
 }

@@ -1,6 +1,6 @@
 //! Input events, key bindings, and routing between the UI and the scene.
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 use ratatui::crossterm::event::{
     self as ct, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
 };
@@ -17,11 +17,6 @@ pub enum Event {
         row: u16,
         button: MouseButton,
     },
-    MouseUp {
-        col: u16,
-        row: u16,
-        button: MouseButton,
-    },
     MouseDrag {
         col: u16,
         row: u16,
@@ -31,25 +26,12 @@ pub enum Event {
         col: u16,
         row: u16,
     },
-    Scroll {
-        col: u16,
-        row: u16,
-        delta: i8,
-    },
+    Scroll(i8),
     Paste(String),
-    Resize {
-        cols: u16,
-        rows: u16,
-    },
+    Resize,
 }
 
-/// Converts a crossterm event.
-///
-/// # Arguments
-/// * `ev` - the raw terminal event
-///
-/// # Returns
-/// The matching `Event`, or `None` for events mote ignores.
+/// Converts a crossterm event, or returns `None` for events mote ignores.
 pub fn from_crossterm(ev: ct::Event) -> Option<Event> {
     Some(match ev {
         ct::Event::Key(k) if k.kind != KeyEventKind::Release => Event::Key(k),
@@ -57,20 +39,15 @@ pub fn from_crossterm(ev: ct::Event) -> Option<Event> {
             let (col, row) = (m.column, m.row);
             match m.kind {
                 MouseEventKind::Down(button) => Event::MouseDown { col, row, button },
-                MouseEventKind::Up(button) => Event::MouseUp { col, row, button },
                 MouseEventKind::Drag(button) => Event::MouseDrag { col, row, button },
                 MouseEventKind::Moved => Event::MouseMove { col, row },
-                MouseEventKind::ScrollUp => Event::Scroll {
-                    col,
-                    row,
-                    delta: -1,
-                },
-                MouseEventKind::ScrollDown => Event::Scroll { col, row, delta: 1 },
+                MouseEventKind::ScrollUp => Event::Scroll(-1),
+                MouseEventKind::ScrollDown => Event::Scroll(1),
                 _ => return None,
             }
         }
         ct::Event::Paste(s) => Event::Paste(s),
-        ct::Event::Resize(cols, rows) => Event::Resize { cols, rows },
+        ct::Event::Resize(..) => Event::Resize,
         _ => return None,
     })
 }
@@ -85,27 +62,8 @@ pub struct KeyBinding {
 impl TryFrom<String> for KeyBinding {
     type Error = anyhow::Error;
 
+    /// Parses a case-insensitive key name such as `q`, `esc`, `f2` or `ctrl+x`.
     fn try_from(s: String) -> anyhow::Result<Self> {
-        Self::parse(&s)
-    }
-}
-
-impl KeyBinding {
-    pub const fn new(code: KeyCode) -> Self {
-        Self {
-            code,
-            mods: KeyModifiers::NONE,
-        }
-    }
-
-    /// Parses a key name such as `q`, `esc`, `f2` or `ctrl+x`.
-    ///
-    /// # Arguments
-    /// * `s` - the key name, case-insensitive
-    ///
-    /// # Returns
-    /// The binding, or an error for an unknown key.
-    pub fn parse(s: &str) -> anyhow::Result<KeyBinding> {
         let lower = s.trim().to_lowercase();
         let mut mods = KeyModifiers::NONE;
         let mut rest = lower.as_str();
@@ -125,28 +83,27 @@ impl KeyBinding {
             "tab" => KeyCode::Tab,
             "enter" | "return" => KeyCode::Enter,
             "space" => KeyCode::Char(' '),
-            f if f.starts_with('f') && f.len() > 1 => {
-                let n: u8 = f[1..]
-                    .parse()
-                    .with_context(|| format!("invalid key '{s}'"))?;
-                if !(1..=12).contains(&n) {
-                    bail!("invalid key '{s}'");
-                }
-                KeyCode::F(n)
-            }
             c if c.chars().count() == 1 => KeyCode::Char(c.chars().next().unwrap()),
-            _ => bail!("invalid key '{s}'"),
+            f => KeyCode::F(
+                f.strip_prefix('f')
+                    .and_then(|n| n.parse().ok())
+                    .filter(|n| (1..=12).contains(n))
+                    .with_context(|| format!("invalid key '{s}'"))?,
+            ),
         };
         Ok(KeyBinding { code, mods })
     }
+}
+
+impl KeyBinding {
+    pub const fn new(code: KeyCode) -> Self {
+        Self {
+            code,
+            mods: KeyModifiers::NONE,
+        }
+    }
 
     /// Checks a key press against this binding, ignoring Shift.
-    ///
-    /// # Arguments
-    /// * `k` - the key event
-    ///
-    /// # Returns
-    /// `true` if the key and modifiers match.
     pub fn matches(&self, k: &KeyEvent) -> bool {
         let code = match k.code {
             KeyCode::Char(c) => KeyCode::Char(c.to_ascii_lowercase()),
@@ -173,46 +130,27 @@ pub enum Route {
     Scene,
 }
 
-/// Decides who handles an event.
-///
-/// # Arguments
-/// * `ev` - the event
-/// * `focus` - whether the login panel or the scene has keyboard focus
-/// * `keys` - the configured key bindings
-/// * `login_rect` - the login panel's area, or `None` when it isn't shown
-///
-/// # Returns
-/// The action to take or the target that receives the event.
+/// Decides who handles an event. `login_rect` is `None` when the login panel isn't shown.
 pub fn route(ev: &Event, focus: Focus, keys: &KeyConfig, login_rect: Option<Rect>) -> Route {
-    let focused = if login_rect.is_some() && focus == Focus::Login {
-        Route::Login
-    } else {
-        Route::Scene
-    };
+    let shown = login_rect.is_some();
+    let login = shown && focus == Focus::Login;
     match ev {
-        Event::Key(k) => {
-            if k.code == KeyCode::Char('c') && k.modifiers.contains(KeyModifiers::CONTROL) {
-                Route::Quit
-            } else if keys.toggle_matcher.matches(k) {
-                Route::ToggleMatcher
-            } else if keys.toggle_debug.matches(k) {
-                Route::ToggleDebug
-            } else if focused == Route::Login && keys.focus_scene.matches(k) {
-                Route::FocusScene
-            } else if focused == Route::Scene && login_rect.is_some() && keys.focus_login.matches(k)
-            {
-                Route::FocusLogin
-            } else if focused == Route::Scene && keys.quit.matches(k) {
-                Route::Quit
-            } else {
-                focused
-            }
+        Event::Key(k)
+            if k.code == KeyCode::Char('c') && k.modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            Route::Quit
         }
-        Event::Paste(_) => focused,
-        Event::MouseDown { col, row, .. } => match login_rect {
-            Some(r) if r.contains(Position::new(*col, *row)) => Route::Login,
-            _ => Route::Scene,
-        },
+        Event::Key(k) if keys.toggle_matcher.matches(k) => Route::ToggleMatcher,
+        Event::Key(k) if keys.toggle_debug.matches(k) => Route::ToggleDebug,
+        Event::Key(k) if login && keys.focus_scene.matches(k) => Route::FocusScene,
+        Event::Key(k) if !login && shown && keys.focus_login.matches(k) => Route::FocusLogin,
+        Event::Key(k) if !login && keys.quit.matches(k) => Route::Quit,
+        Event::Key(_) | Event::Paste(_) if login => Route::Login,
+        Event::MouseDown { col, row, .. }
+            if login_rect.is_some_and(|r| r.contains(Position::new(*col, *row))) =>
+        {
+            Route::Login
+        }
         _ => Route::Scene,
     }
 }
@@ -234,95 +172,32 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_c_always_quits() {
-        for f in [Focus::Login, Focus::Scene] {
-            assert!(matches!(
-                route(
-                    &key(KeyCode::Char('c'), KeyModifiers::CONTROL),
-                    f,
-                    &kb(),
-                    None
-                ),
-                Route::Quit
-            ));
-        }
-    }
-
-    #[test]
-    fn q_types_into_login_but_quits_scene() {
-        let r = Some(Rect::new(10, 5, 40, 8));
-        assert!(matches!(
-            route(
-                &key(KeyCode::Char('q'), KeyModifiers::NONE),
-                Focus::Login,
-                &kb(),
-                r
-            ),
-            Route::Login
-        ));
-        assert!(matches!(
-            route(
-                &key(KeyCode::Char('q'), KeyModifiers::NONE),
-                Focus::Scene,
-                &kb(),
-                r
-            ),
-            Route::Quit
-        ));
-    }
-
-    #[test]
-    fn focus_keys_and_click() {
-        let r = Some(Rect::new(10, 5, 40, 8));
-        assert!(matches!(
-            route(
-                &key(KeyCode::Esc, KeyModifiers::NONE),
-                Focus::Login,
-                &kb(),
-                r
-            ),
+    fn routes() {
+        let rect = Some(Rect::new(10, 5, 40, 8));
+        let r = |ev, f| route(&ev, f, &kb(), rect);
+        let ctrl_c = || key(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        let q = || key(KeyCode::Char('q'), KeyModifiers::NONE);
+        let click = |col, row| Event::MouseDown {
+            col,
+            row,
+            button: MouseButton::Left,
+        };
+        assert_eq!(route(&ctrl_c(), Focus::Login, &kb(), None), Route::Quit);
+        assert_eq!(r(ctrl_c(), Focus::Login), Route::Quit);
+        assert_eq!(r(ctrl_c(), Focus::Scene), Route::Quit);
+        assert_eq!(r(q(), Focus::Login), Route::Login);
+        assert_eq!(r(q(), Focus::Scene), Route::Quit);
+        assert_eq!(
+            r(key(KeyCode::Esc, KeyModifiers::NONE), Focus::Login),
             Route::FocusScene
-        ));
-        assert!(matches!(
-            route(
-                &key(KeyCode::Tab, KeyModifiers::NONE),
-                Focus::Scene,
-                &kb(),
-                r
-            ),
+        );
+        assert_eq!(
+            r(key(KeyCode::Tab, KeyModifiers::NONE), Focus::Scene),
             Route::FocusLogin
-        ));
-        assert!(matches!(
-            route(
-                &Event::MouseDown {
-                    col: 12,
-                    row: 6,
-                    button: MouseButton::Left
-                },
-                Focus::Scene,
-                &kb(),
-                r
-            ),
-            Route::Login
-        ));
-        assert!(matches!(
-            route(
-                &Event::MouseDown {
-                    col: 0,
-                    row: 0,
-                    button: MouseButton::Left
-                },
-                Focus::Login,
-                &kb(),
-                r
-            ),
-            Route::Scene
-        ));
-    }
-
-    #[test]
-    fn f2_toggles_matcher_from_login() {
-        assert!(matches!(
+        );
+        assert_eq!(r(click(12, 6), Focus::Scene), Route::Login);
+        assert_eq!(r(click(0, 0), Focus::Login), Route::Scene);
+        assert_eq!(
             route(
                 &key(KeyCode::F(2), KeyModifiers::NONE),
                 Focus::Login,
@@ -330,18 +205,20 @@ mod tests {
                 None
             ),
             Route::ToggleMatcher
-        ));
+        );
     }
 
     #[test]
     fn keybinding_parse() {
+        let parse = |s: &str| KeyBinding::try_from(s.to_string());
         assert!(
-            KeyBinding::parse("ctrl+x")
+            parse("ctrl+x")
                 .unwrap()
                 .matches(&KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL))
         );
-        assert!(KeyBinding::parse("F12").is_ok());
-        assert!(KeyBinding::parse("hyper+q").is_err());
+        assert!(parse("F12").is_ok());
+        assert!(parse("f13").is_err());
+        assert!(parse("hyper+q").is_err());
     }
 
     #[test]
@@ -364,11 +241,7 @@ mod tests {
         );
         assert_eq!(
             from_crossterm(mouse(MouseEventKind::ScrollUp)),
-            Some(Event::Scroll {
-                col: 3,
-                row: 4,
-                delta: -1
-            })
+            Some(Event::Scroll(-1))
         );
         assert_eq!(
             from_crossterm(ct::Event::Paste("x".into())),

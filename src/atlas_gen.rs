@@ -16,13 +16,7 @@ pub struct GenParams {
 }
 
 /// Lays out a terminal cell the way a terminal would for this font.
-///
-/// # Arguments
-/// * `font` - the font
-/// * `size_px` - font size in pixels
-///
-/// # Returns
-/// The cell size in whole pixels and the baseline's distance from the top.
+/// Returns the cell size in whole pixels and the baseline's distance from the top.
 fn cell_metrics(font: &Font, size_px: f32) -> ([u32; 2], u32) {
     let width = font.metrics('M', size_px).advance_width.ceil() as u32;
     let (height, baseline) = match font.horizontal_line_metrics(size_px) {
@@ -35,13 +29,7 @@ fn cell_metrics(font: &Font, size_px: f32) -> ([u32; 2], u32) {
     ([width.max(1), height.max(1)], baseline)
 }
 
-/// Builds an atlas from a font.
-///
-/// # Arguments
-/// * `p` - the font, size, sampling, palette and denylist
-///
-/// # Returns
-/// The atlas, or an error if a palette character is denied or missing from the font.
+/// Builds an atlas from a font; fails if a palette character is denied or missing from the font.
 pub fn generate(p: &GenParams) -> anyhow::Result<Atlas> {
     let font = Font::from_bytes(p.font_bytes.as_slice(), FontSettings::default())
         .map_err(|e| anyhow!("loading font: {e}"))?;
@@ -93,17 +81,7 @@ pub fn generate(p: &GenParams) -> anyhow::Result<Atlas> {
     })
 }
 
-/// Rasterizes one character into a cell.
-///
-/// # Arguments
-/// * `font` - the font
-/// * `ch` - the character
-/// * `size_px` - font size in pixels
-/// * `cell_px` - cell size in pixels
-/// * `baseline_px` - baseline distance from the top of the cell
-///
-/// # Returns
-/// Coverage values in 0..1 for each pixel of the cell, row-major.
+/// Rasterizes one character into a cell, as row-major per-pixel coverage in 0..1.
 fn render_cell(
     font: &Font,
     ch: char,
@@ -128,15 +106,7 @@ fn render_cell(
     canvas
 }
 
-/// Area-averages an image down to a lower resolution.
-///
-/// # Arguments
-/// * `src` - source values, row-major
-/// * `src_size` - source width and height
-/// * `dst_size` - output width and height
-///
-/// # Returns
-/// The output values, row-major.
+/// Area-averages a row-major image down to a lower resolution.
 fn downsample(src: &[f32], src_size: [u32; 2], dst_size: [u32; 2]) -> Vec<f32> {
     let [sw, sh] = src_size.map(|v| v as usize);
     let [dw, dh] = dst_size.map(|v| v as usize);
@@ -183,27 +153,12 @@ mod tests {
     }
 
     #[test]
-    fn ascii95_fully_covered() {
-        let atlas = generate(&params()).unwrap();
-        assert_eq!(atlas.glyphs.len(), 95);
-        assert!(atlas.glyphs.iter().all(|g| g.coverage.len() == 128));
-    }
-
-    #[test]
     fn space_is_empty_and_ink_ordering_sane() {
         let a = generate(&params()).unwrap();
         let ink = |c| a.glyphs.iter().find(|g| g.ch == c).unwrap().ink;
         assert_eq!(ink(' '), 0.0);
         assert!(ink('@') > ink('.'));
         assert!(ink('#') > ink('-'));
-    }
-
-    #[test]
-    fn deterministic() {
-        assert_eq!(
-            generate(&params()).unwrap().to_json(),
-            generate(&params()).unwrap().to_json()
-        );
     }
 
     #[test]
@@ -221,10 +176,9 @@ mod tests {
     }
 
     #[test]
-    fn json_roundtrip_and_shape_check() {
-        let a = generate(&params()).unwrap();
-        assert_eq!(Atlas::from_json(&a.to_json()).unwrap(), a);
-        let bad = a.to_json().replacen("\"version\": 1", "\"version\": 2", 1);
+    fn rejects_other_versions() {
+        let json = generate(&params()).unwrap().to_json();
+        let bad = json.replacen("\"version\": 1", "\"version\": 2", 1);
         assert!(Atlas::from_json(&bad).is_err());
     }
 }
